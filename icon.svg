@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7a4f35"/>
+      <stop offset="1" stop-color="#34201a"/>
+    </linearGradient>
+    <linearGradient id="cup" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdf6ec"/>
+      <stop offset="1" stop-color="#e3d0b8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- macOS-style squircle background -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)"/>
+
+  <!-- steam as sound waves: the mic is always listening-ready -->
+  <g fill="none" stroke="#f5e9dc" stroke-linecap="round">
+    <path d="M 458 366 A 76 76 0 0 1 566 366" stroke-width="40" opacity="1"/>
+    <path d="M 407 315 A 148 148 0 0 1 617 315" stroke-width="40" opacity="0.65"/>
+    <path d="M 356 264 A 220 220 0 0 1 668 264" stroke-width="40" opacity="0.35"/>
+  </g>
+
+  <!-- espresso cup -->
+  <path d="M 338 452
+           L 356 692
+           Q 359 728 396 728
+           L 628 728
+           Q 665 728 668 692
+           L 686 452
+           Z"
+        fill="url(#cup)"/>
+  <!-- handle -->
+  <path d="M 682 500 q 96 -16 90 74 q -6 78 -104 64"
+        fill="none" stroke="#f5e9dc" stroke-width="34" stroke-linecap="round"/>
+  <!-- espresso rim -->
+  <path d="M 344 486 L 680 486" stroke="#4a2c1d" stroke-width="26" opacity="0.28"/>
+
+  <!-- saucer -->
+  <path d="M 262 770
+           Q 262 748 292 748
+           L 732 748
+           Q 762 748 762 770
+           Q 762 792 732 792
+           L 292 792
+           Q 262 792 262 770
+           Z"
+        fill="#f5e9dc"/>
+</svg>
