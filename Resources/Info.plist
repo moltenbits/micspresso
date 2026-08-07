@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>Micspresso</string>
+	<key>CFBundleDisplayName</key>
+	<string>Micspresso</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.moltenbits.micspresso</string>
+	<key>CFBundleExecutable</key>
+	<string>micspresso</string>
+	<key>CFBundleVersion</key>
+	<string>0.0.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.0.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Micspresso holds your microphone open (without recording anything) so it responds instantly when you start dictating or talking.</string>
+</dict>
+</plist>
