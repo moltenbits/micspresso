@@ -17,11 +17,10 @@ final class SettingsStoreTests: XCTestCase {
     super.tearDown()
   }
 
-  func testDefaultsToEnabledAndBluetoothOnly() {
+  func testDefaultsToEnabled() {
     let store = UserDefaultsSettingsStore(defaults: defaults)
 
     XCTAssertTrue(store.enabled)
-    XCTAssertTrue(store.bluetoothOnly)
   }
 
   func testPersistsEnabled() {
@@ -30,13 +29,5 @@ final class SettingsStoreTests: XCTestCase {
 
     let reloaded = UserDefaultsSettingsStore(defaults: defaults)
     XCTAssertFalse(reloaded.enabled)
-  }
-
-  func testPersistsBluetoothOnly() {
-    let store = UserDefaultsSettingsStore(defaults: defaults)
-    store.bluetoothOnly = false
-
-    let reloaded = UserDefaultsSettingsStore(defaults: defaults)
-    XCTAssertFalse(reloaded.bluetoothOnly)
   }
 }

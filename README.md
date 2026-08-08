@@ -26,6 +26,10 @@ its mic link — and the moment a real app wants audio, it's already hot.
 Core Audio shares input devices between clients, so dictation, calls, and
 recordings all work exactly as before, just without the wake-up delay.
 
+Only Bluetooth mics are warmed: wired and built-in mics have no wake-up
+delay, so holding them open would light the privacy indicator for nothing.
+When your default input isn't Bluetooth, Micspresso simply idles.
+
 **Micspresso never reads, stores, or transmits audio.** The capture callback
 literally ignores the buffers — it counts them (to detect a dead session) and
 returns.
@@ -53,9 +57,6 @@ the menu bar — filled while a mic is being kept warm, outlined otherwise.
 Everything lives in the menu bar menu:
 
 - **Pause / Resume Keeping Warm** — one click to get out of the way.
-- **Warm Bluetooth Mics Only** (default: on) — wired and built-in mics have
-  no wake-up delay, so warming them would light the privacy indicator for
-  nothing. Turn this off if you want every default input held open anyway.
 - **Launch at Login**
 - The status line always tells you what's happening ("Keeping AirPods Pro
   warm", "MacBook Pro Microphone isn't Bluetooth — not warming", …).

@@ -62,11 +62,8 @@ final class MockMicPermission: MicPermissionChecking {
 
 final class MockSettingsStore: SettingsStoring {
   var enabled: Bool
-  var bluetoothOnly: Bool
-
-  init(enabled: Bool = true, bluetoothOnly: Bool = true) {
+  init(enabled: Bool = true) {
     self.enabled = enabled
-    self.bluetoothOnly = bluetoothOnly
   }
 }
 
@@ -137,7 +134,4 @@ extension AudioInputDevice {
       id: id, uid: "builtin-uid", name: "MacBook Pro Microphone", transport: .builtIn)
   }
 
-  static func usb(id: UInt32 = 9) -> AudioInputDevice {
-    AudioInputDevice(id: id, uid: "usb-uid", name: "USB Interface", transport: .usb)
-  }
 }

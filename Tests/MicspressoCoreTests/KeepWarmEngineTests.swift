@@ -38,23 +38,13 @@ final class KeepWarmEngineTests: XCTestCase {
     XCTAssertEqual(warmer.startedDevices, [.airPods()])
   }
 
-  func testSkipsBuiltInMicWhenBluetoothOnly() {
+  func testSkipsNonBluetoothDefaultInput() {
     provider.defaultInputDevice = .builtIn()
 
     engine.start()
 
     XCTAssertEqual(engine.state, .ineligibleDevice(.builtIn()))
     XCTAssertTrue(warmer.startedDevices.isEmpty)
-  }
-
-  func testWarmsBuiltInMicWhenPolicyAllowsAllDevices() {
-    settings.bluetoothOnly = false
-    provider.defaultInputDevice = .builtIn()
-
-    engine.start()
-
-    XCTAssertEqual(engine.state, .warming(.builtIn()))
-    XCTAssertEqual(warmer.startedDevices, [.builtIn()])
   }
 
   func testNoInputDeviceGoesIdle() {
@@ -171,19 +161,6 @@ final class KeepWarmEngineTests: XCTestCase {
 
     XCTAssertEqual(engine.state, .warming(.airPods()))
     XCTAssertEqual(warmer.startedDevices.count, 2)
-  }
-
-  func testPolicyChangeToBluetoothOnlyStopsWarmingWiredDevice() {
-    settings.bluetoothOnly = false
-    provider.defaultInputDevice = .usb()
-    engine.start()
-    XCTAssertEqual(engine.state, .warming(.usb()))
-
-    engine.setBluetoothOnly(true)
-
-    XCTAssertEqual(engine.state, .ineligibleDevice(.usb()))
-    XCTAssertNil(warmer.warmedDeviceID)
-    XCTAssertTrue(settings.bluetoothOnly)
   }
 
   // MARK: - Sleep / wake

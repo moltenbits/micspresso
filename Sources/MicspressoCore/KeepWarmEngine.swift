@@ -12,8 +12,9 @@ public enum EngineState: Equatable {
   case permissionDenied
   /// No input device present at all.
   case noInputDevice
-  /// Default input exists but the policy says not to warm it
-  /// (e.g. a wired mic while "Bluetooth only" is on).
+  /// Default input exists but isn't Bluetooth, so there's nothing to warm:
+  /// wired and built-in mics have no wake-up delay, and holding them open
+  /// would just light the privacy indicator for nothing.
   case ineligibleDevice(AudioInputDevice)
   /// Actively holding this device open.
   case warming(AudioInputDevice)
@@ -61,7 +62,6 @@ public final class KeepWarmEngine {
   }
 
   public var isEnabled: Bool { settings.enabled }
-  public var isBluetoothOnly: Bool { settings.bluetoothOnly }
 
   private var isAsleep = false
   private var debounceTimer: EngineTimer?
@@ -96,11 +96,6 @@ public final class KeepWarmEngine {
 
   public func setEnabled(_ enabled: Bool) {
     settings.enabled = enabled
-    reconcile()
-  }
-
-  public func setBluetoothOnly(_ bluetoothOnly: Bool) {
-    settings.bluetoothOnly = bluetoothOnly
     reconcile()
   }
 
@@ -167,7 +162,7 @@ public final class KeepWarmEngine {
       state = .noInputDevice
       return
     }
-    guard device.isBluetooth || !settings.bluetoothOnly else {
+    guard device.isBluetooth else {
       stopWarming()
       state = .ineligibleDevice(device)
       return

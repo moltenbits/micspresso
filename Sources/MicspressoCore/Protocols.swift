@@ -32,9 +32,6 @@ public protocol MicPermissionChecking: AnyObject {
 public protocol SettingsStoring: AnyObject {
   /// Whether keeping warm is enabled at all (user pause/resume).
   var enabled: Bool { get set }
-  /// Only warm Bluetooth inputs. Wired mics have no wake-up delay, so
-  /// warming them just lights the privacy indicator for nothing.
-  var bluetoothOnly: Bool { get set }
 }
 
 public protocol EngineTimer: AnyObject {

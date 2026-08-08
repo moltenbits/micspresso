@@ -49,13 +49,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     toggle.target = self
     menu.addItem(toggle)
 
-    let bluetoothOnly = NSMenuItem(
-      title: "Warm Bluetooth Mics Only",
-      action: #selector(toggleBluetoothOnly), keyEquivalent: "")
-    bluetoothOnly.target = self
-    bluetoothOnly.state = engine.isBluetoothOnly ? .on : .off
-    menu.addItem(bluetoothOnly)
-
     menu.addItem(.separator())
 
     let launchAtLogin = NSMenuItem(
@@ -118,10 +111,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
   @objc private func toggleEnabled() {
     engine.setEnabled(!engine.isEnabled)
-  }
-
-  @objc private func toggleBluetoothOnly() {
-    engine.setBluetoothOnly(!engine.isBluetoothOnly)
   }
 
   @objc private func toggleLaunchAtLogin() {
