@@ -83,9 +83,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     about.target = self
     menu.addItem(about)
 
+    // Custom selector on purpose: on macOS Tahoe, AppKit auto-attaches an
+    // SF Symbol to items with system-known selectors like terminate(_:),
+    // which also indents every icon-less item in the same menu section.
     let quit = NSMenuItem(
-      title: "Quit Micspresso", action: #selector(NSApplication.terminate(_:)),
-      keyEquivalent: "q")
+      title: "Quit Micspresso", action: #selector(quitApp), keyEquivalent: "q")
+    quit.target = self
     menu.addItem(quit)
   }
 
@@ -147,6 +150,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
   @objc private func showAbout() {
     AboutPanel.show()
+  }
+
+  @objc private func quitApp() {
+    NSApp.terminate(nil)
   }
 
   @objc private func toggleLaunchAtLogin() {
