@@ -1,11 +1,9 @@
 # Micspresso ☕️🎙️
 
-> AirPods microphone acting tired? Give it a boost with Micspresso!
-
-[![CI](https://github.com/moltenbits/micspresso/actions/workflows/ci.yml/badge.svg)](https://github.com/moltenbits/micspresso/actions/workflows/ci.yml)
-
 Micspresso is a macOS menu bar app that keeps your microphone *warm* so it's
 instantly ready when you start talking.
+
+[![CI](https://github.com/moltenbits/micspresso/actions/workflows/ci.yml/badge.svg)](https://github.com/moltenbits/micspresso/actions/workflows/ci.yml)
 
 ## The problem
 
