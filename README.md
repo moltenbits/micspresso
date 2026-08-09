@@ -49,8 +49,9 @@ cd micspresso
 make install   # builds the app bundle and copies it to /Applications
 ```
 
-Launch it, allow microphone access when prompted, and look for the ☕️ cup in
-the menu bar — filled while a mic is being kept warm, outlined otherwise.
+Launch it, allow microphone access when prompted, and look for the mic in
+the menu bar — it steams while a mic is being kept awake, and cools off
+when paused or idle.
 
 ## Usage
 
@@ -84,10 +85,10 @@ The CLI binary also answers `--version` and `--help`.
   holds the device open. Deliberately *not* `AVCaptureSession`, whose
   teardown can deadlock against coreaudiod when a Bluetooth device vanishes
   mid-session.
-- A **device monitor** follows the system default input. Change events are
-  debounced for a couple of seconds because a single Bluetooth handoff fires
-  several rapid events — sometimes with a transient "no default input" in the
-  middle.
+- A **device monitor** enumerates connected Bluetooth mics and follows the
+  system default input for auto-picking. Change events are debounced for a
+  couple of seconds because a single Bluetooth handoff fires several rapid
+  events — sometimes with a transient "no default input" in the middle.
 - A **heartbeat watchdog** notices when IO callbacks stop flowing (a
   coreaudiod restart kills capture sessions without any notification) and
   rebuilds the session.
