@@ -3,9 +3,14 @@ import Foundation
 @testable import MicspressoCore
 
 final class MockAudioInputProvider: AudioInputProviding {
+  var bluetoothInputDevices: [AudioInputDevice]
   var defaultInputDevice: AudioInputDevice?
 
-  init(defaultInputDevice: AudioInputDevice? = nil) {
+  init(
+    bluetoothInputDevices: [AudioInputDevice] = [],
+    defaultInputDevice: AudioInputDevice? = nil
+  ) {
+    self.bluetoothInputDevices = bluetoothInputDevices
     self.defaultInputDevice = defaultInputDevice
   }
 }
@@ -62,8 +67,11 @@ final class MockMicPermission: MicPermissionChecking {
 
 final class MockSettingsStore: SettingsStoring {
   var enabled: Bool
-  init(enabled: Bool = true) {
+  var selectedMicUID: String?
+
+  init(enabled: Bool = true, selectedMicUID: String? = nil) {
     self.enabled = enabled
+    self.selectedMicUID = selectedMicUID
   }
 }
 
@@ -129,9 +137,12 @@ extension AudioInputDevice {
     AudioInputDevice(id: id, uid: "airpods-uid-\(id)", name: "AirPods Pro", transport: .bluetooth)
   }
 
+  static func airPodsMax(id: UInt32 = 77) -> AudioInputDevice {
+    AudioInputDevice(id: id, uid: "airpodsmax-uid", name: "AirPods Max", transport: .bluetooth)
+  }
+
   static func builtIn(id: UInt32 = 7) -> AudioInputDevice {
     AudioInputDevice(
       id: id, uid: "builtin-uid", name: "MacBook Pro Microphone", transport: .builtIn)
   }
-
 }

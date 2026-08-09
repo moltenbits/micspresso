@@ -28,10 +28,28 @@ final class StatusItemController: NSObject, NSMenuDelegate {
   func menuNeedsUpdate(_ menu: NSMenu) {
     menu.removeAllItems()
 
-    let statusLineItem = NSMenuItem(
-      title: statusLine(for: currentState), action: nil, keyEquivalent: "")
-    statusLineItem.isEnabled = false
-    menu.addItem(statusLineItem)
+    let mics = engine.availableMics
+    if !mics.isEmpty {
+      let header = NSMenuItem(title: "Keep Awake", action: nil, keyEquivalent: "")
+      header.isEnabled = false
+      menu.addItem(header)
+
+      for mic in mics {
+        let item = NSMenuItem(title: mic.name, action: #selector(selectMic(_:)), keyEquivalent: "")
+        item.target = self
+        item.representedObject = mic.uid
+        if case .warming(let device) = currentState, device.uid == mic.uid {
+          item.state = .on
+        }
+        menu.addItem(item)
+      }
+    }
+
+    if let line = statusMenuLine(for: currentState) {
+      let statusLineItem = NSMenuItem(title: line, action: nil, keyEquivalent: "")
+      statusLineItem.isEnabled = false
+      menu.addItem(statusLineItem)
+    }
 
     if currentState == .permissionDenied {
       let openSettings = NSMenuItem(
@@ -44,7 +62,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     menu.addItem(.separator())
 
     let toggle = NSMenuItem(
-      title: engine.isEnabled ? "Pause Keeping Warm" : "Resume Keeping Warm",
+      title: engine.isEnabled ? "Pause Keeping Awake" : "Resume Keeping Awake",
       action: #selector(toggleEnabled), keyEquivalent: "")
     toggle.target = self
     menu.addItem(toggle)
@@ -90,6 +108,19 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
   private func statusLine(for state: EngineState) -> String {
     switch state {
+    case .warming(let device):
+      return "Keeping \(device.name) awake"
+    default:
+      return statusMenuLine(for: state) ?? "Micspresso"
+    }
+  }
+
+  /// The disabled explainer line in the menu; nil while warming, where the
+  /// checkmark in the mic list already tells the story.
+  private func statusMenuLine(for state: EngineState) -> String? {
+    switch state {
+    case .warming:
+      return nil
     case .paused:
       return "Paused"
     case .asleep:
@@ -98,12 +129,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
       return "Waiting for microphone permission…"
     case .permissionDenied:
       return "Microphone access denied"
-    case .noInputDevice:
-      return "No input device found"
-    case .ineligibleDevice(let device):
-      return "\(device.name) isn't Bluetooth — not warming"
-    case .warming(let device):
-      return "Keeping \(device.name) warm"
+    case .noBluetoothMic:
+      return "No Bluetooth mic connected"
     case .warmingFailed(let device):
       return "Can't hold \(device.name) — retrying…"
     }
@@ -111,6 +138,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
   @objc private func toggleEnabled() {
     engine.setEnabled(!engine.isEnabled)
+  }
+
+  @objc private func selectMic(_ sender: NSMenuItem) {
+    guard let uid = sender.representedObject as? String else { return }
+    engine.selectMic(uid: uid)
   }
 
   @objc private func toggleLaunchAtLogin() {

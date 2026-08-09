@@ -1,7 +1,11 @@
 import Foundation
 
-/// Answers "what is the system's default input device right now?"
+/// Answers "which input devices exist right now?"
 public protocol AudioInputProviding: AnyObject {
+  /// Connected Bluetooth input devices, sorted by name.
+  var bluetoothInputDevices: [AudioInputDevice] { get }
+  /// The system default input device, used to auto-pick a mic when the
+  /// user hasn't selected one.
   var defaultInputDevice: AudioInputDevice? { get }
 }
 
@@ -32,6 +36,9 @@ public protocol MicPermissionChecking: AnyObject {
 public protocol SettingsStoring: AnyObject {
   /// Whether keeping warm is enabled at all (user pause/resume).
   var enabled: Bool { get set }
+  /// UID of the mic the user chose to keep awake; nil means auto
+  /// (prefer the default input, then the first available Bluetooth mic).
+  var selectedMicUID: String? { get set }
 }
 
 public protocol EngineTimer: AnyObject {

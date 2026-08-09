@@ -3,6 +3,7 @@ import Foundation
 public final class UserDefaultsSettingsStore: SettingsStoring {
   private enum Key {
     static let enabled = "keepWarmEnabled"
+    static let selectedMicUID = "selectedMicUID"
   }
 
   private let defaults: UserDefaults
@@ -14,5 +15,10 @@ public final class UserDefaultsSettingsStore: SettingsStoring {
   public var enabled: Bool {
     get { defaults.object(forKey: Key.enabled) as? Bool ?? true }
     set { defaults.set(newValue, forKey: Key.enabled) }
+  }
+
+  public var selectedMicUID: String? {
+    get { defaults.string(forKey: Key.selectedMicUID) }
+    set { defaults.set(newValue, forKey: Key.selectedMicUID) }
   }
 }

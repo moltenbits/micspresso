@@ -34,6 +34,14 @@ public final class CoreAudioInputMonitor: AudioInputProviding {
     return describe(deviceID: deviceID)
   }
 
+  public var bluetoothInputDevices: [AudioInputDevice] {
+    allDeviceIDs()
+      .filter { hasInputStreams($0) }
+      .map { describe(deviceID: $0) }
+      .filter(\.isBluetooth)
+      .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+  }
+
   public func startMonitoring() {
     guard listenerBlock == nil else { return }
 
@@ -65,6 +73,35 @@ public final class CoreAudioInputMonitor: AudioInputProviding {
     }
     listenerBlock = nil
     listeningAddresses = []
+  }
+
+  private func allDeviceIDs() -> [AudioDeviceID] {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioHardwarePropertyDevices,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    let sizeStatus = AudioObjectGetPropertyDataSize(
+      AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size)
+    guard sizeStatus == noErr, size > 0 else { return [] }
+
+    var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+    let status = ids.withUnsafeMutableBufferPointer { buffer in
+      AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, buffer.baseAddress!)
+    }
+    guard status == noErr else { return [] }
+    return ids
+  }
+
+  private func hasInputStreams(_ deviceID: AudioDeviceID) -> Bool {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioDevicePropertyStreams,
+      mScope: kAudioDevicePropertyScopeInput,
+      mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    let status = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
+    return status == noErr && size >= UInt32(MemoryLayout<AudioStreamID>.size)
   }
 
   private func describe(deviceID: AudioDeviceID) -> AudioInputDevice {

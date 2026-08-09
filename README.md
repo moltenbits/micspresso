@@ -20,15 +20,15 @@ fast.
 
 ## The fix
 
-Micspresso holds the default input device open with a no-op Core Audio
-client. The device sees an active capture session, so it never powers down
-its mic link — and the moment a real app wants audio, it's already hot.
-Core Audio shares input devices between clients, so dictation, calls, and
-recordings all work exactly as before, just without the wake-up delay.
+Micspresso holds your Bluetooth mic open with a no-op Core Audio client.
+The device sees an active capture session, so it never powers down its mic
+link — and the moment a real app wants audio, it's already hot. Core Audio
+shares input devices between clients, so dictation, calls, and recordings
+all work exactly as before, just without the wake-up delay.
 
-Only Bluetooth mics are warmed: wired and built-in mics have no wake-up
+Only Bluetooth mics are kept awake: wired and built-in mics have no wake-up
 delay, so holding them open would light the privacy indicator for nothing.
-When your default input isn't Bluetooth, Micspresso simply idles.
+When no Bluetooth mic is connected, Micspresso simply idles.
 
 **Micspresso never reads, stores, or transmits audio.** The capture callback
 literally ignores the buffers — it counts them (to detect a dead session) and
@@ -56,10 +56,13 @@ the menu bar — filled while a mic is being kept warm, outlined otherwise.
 
 Everything lives in the menu bar menu:
 
-- **Pause / Resume Keeping Warm** — one click to get out of the way.
+- **Keep Awake** — a list of your connected Bluetooth mics; the checked one
+  is being kept awake. Click another to switch. With no selection, Micspresso
+  follows the system default input (or the first available Bluetooth mic),
+  and a disconnected pick falls back to whatever's still connected until it
+  returns.
+- **Pause / Resume Keeping Awake** — one click to get out of the way.
 - **Launch at Login**
-- The status line always tells you what's happening ("Keeping AirPods Pro
-  warm", "MacBook Pro Microphone isn't Bluetooth — not warming", …).
 
 The CLI binary also answers `--version` and `--help`.
 

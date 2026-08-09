@@ -17,10 +17,22 @@ final class SettingsStoreTests: XCTestCase {
     super.tearDown()
   }
 
-  func testDefaultsToEnabled() {
+  func testDefaultsToEnabledWithNoSelection() {
     let store = UserDefaultsSettingsStore(defaults: defaults)
 
     XCTAssertTrue(store.enabled)
+    XCTAssertNil(store.selectedMicUID)
+  }
+
+  func testPersistsSelectedMicUID() {
+    let store = UserDefaultsSettingsStore(defaults: defaults)
+    store.selectedMicUID = "airpods-uid"
+
+    let reloaded = UserDefaultsSettingsStore(defaults: defaults)
+    XCTAssertEqual(reloaded.selectedMicUID, "airpods-uid")
+
+    reloaded.selectedMicUID = nil
+    XCTAssertNil(UserDefaultsSettingsStore(defaults: defaults).selectedMicUID)
   }
 
   func testPersistsEnabled() {

@@ -10,12 +10,10 @@ public enum EngineState: Equatable {
   case awaitingPermission
   /// Microphone access denied; nothing can be warmed until granted.
   case permissionDenied
-  /// No input device present at all.
-  case noInputDevice
-  /// Default input exists but isn't Bluetooth, so there's nothing to warm:
-  /// wired and built-in mics have no wake-up delay, and holding them open
-  /// would just light the privacy indicator for nothing.
-  case ineligibleDevice(AudioInputDevice)
+  /// No Bluetooth mic connected, so there's nothing to keep awake: wired
+  /// and built-in mics have no wake-up delay, and holding them open would
+  /// just light the privacy indicator for nothing.
+  case noBluetoothMic
   /// Actively holding this device open.
   case warming(AudioInputDevice)
   /// Holding the device open failed; retrying with backoff.
@@ -63,6 +61,9 @@ public final class KeepWarmEngine {
 
   public var isEnabled: Bool { settings.enabled }
 
+  /// The connected Bluetooth mics to offer in the UI.
+  public var availableMics: [AudioInputDevice] { provider.bluetoothInputDevices }
+
   private var isAsleep = false
   private var debounceTimer: EngineTimer?
   private var retryTimer: EngineTimer?
@@ -96,6 +97,14 @@ public final class KeepWarmEngine {
 
   public func setEnabled(_ enabled: Bool) {
     settings.enabled = enabled
+    reconcile()
+  }
+
+  /// Pins keeping-awake to the mic with this UID. The choice is remembered
+  /// even while the mic is disconnected (another connected mic is warmed in
+  /// the meantime) and applies again when it returns.
+  public func selectMic(uid: String) {
+    settings.selectedMicUID = uid
     reconcile()
   }
 
@@ -157,14 +166,9 @@ public final class KeepWarmEngine {
       break
     }
 
-    guard let device = provider.defaultInputDevice else {
+    guard let device = resolveMic() else {
       stopWarming()
-      state = .noInputDevice
-      return
-    }
-    guard device.isBluetooth else {
-      stopWarming()
-      state = .ineligibleDevice(device)
+      state = .noBluetoothMic
       return
     }
 
@@ -187,6 +191,22 @@ public final class KeepWarmEngine {
         "Failed to warm \(device.name, privacy: .public): \(String(describing: error), privacy: .public)"
       )
     }
+  }
+
+  /// The mic that should be kept awake: the user's selection when connected,
+  /// else the default input if it's one of the Bluetooth mics, else the
+  /// first available one.
+  private func resolveMic() -> AudioInputDevice? {
+    let mics = provider.bluetoothInputDevices
+    if let uid = settings.selectedMicUID, let selected = mics.first(where: { $0.uid == uid }) {
+      return selected
+    }
+    if let defaultInput = provider.defaultInputDevice,
+      let match = mics.first(where: { $0.uid == defaultInput.uid })
+    {
+      return match
+    }
+    return mics.first
   }
 
   private func stopWarming() {

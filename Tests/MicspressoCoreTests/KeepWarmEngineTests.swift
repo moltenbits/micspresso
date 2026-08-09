@@ -13,7 +13,10 @@ final class KeepWarmEngineTests: XCTestCase {
 
   override func setUp() {
     super.setUp()
-    provider = MockAudioInputProvider(defaultInputDevice: .airPods())
+    provider = MockAudioInputProvider(
+      bluetoothInputDevices: [.airPods()],
+      defaultInputDevice: .airPods()
+    )
     warmer = MockMicWarmer()
     permission = MockMicPermission(status: .authorized)
     settings = MockSettingsStore()
@@ -29,7 +32,7 @@ final class KeepWarmEngineTests: XCTestCase {
     engine.onStateChange = { [weak self] in self?.stateChanges.append($0) }
   }
 
-  // MARK: - Warming and eligibility
+  // MARK: - Warming and mic resolution
 
   func testWarmsBluetoothDefaultInputOnStart() {
     engine.start()
@@ -38,22 +41,32 @@ final class KeepWarmEngineTests: XCTestCase {
     XCTAssertEqual(warmer.startedDevices, [.airPods()])
   }
 
-  func testSkipsNonBluetoothDefaultInput() {
+  func testNoBluetoothMicsGoesIdle() {
+    provider.bluetoothInputDevices = []
     provider.defaultInputDevice = .builtIn()
 
     engine.start()
 
-    XCTAssertEqual(engine.state, .ineligibleDevice(.builtIn()))
+    XCTAssertEqual(engine.state, .noBluetoothMic)
     XCTAssertTrue(warmer.startedDevices.isEmpty)
   }
 
-  func testNoInputDeviceGoesIdle() {
-    provider.defaultInputDevice = nil
+  func testWarmsFirstBluetoothMicWhenDefaultInputIsNotBluetooth() {
+    provider.bluetoothInputDevices = [.airPodsMax(), .airPods()]
+    provider.defaultInputDevice = .builtIn()
 
     engine.start()
 
-    XCTAssertEqual(engine.state, .noInputDevice)
-    XCTAssertTrue(warmer.startedDevices.isEmpty)
+    XCTAssertEqual(engine.state, .warming(.airPodsMax()))
+  }
+
+  func testDefaultInputPreferredOverListOrder() {
+    provider.bluetoothInputDevices = [.airPodsMax(), .airPods()]
+    provider.defaultInputDevice = .airPods()
+
+    engine.start()
+
+    XCTAssertEqual(engine.state, .warming(.airPods()))
   }
 
   func testStartsPausedWhenDisabledInSettings() {
@@ -73,19 +86,79 @@ final class KeepWarmEngineTests: XCTestCase {
     XCTAssertEqual(warmer.stopCount, 0)
   }
 
+  func testAvailableMicsComeFromProvider() {
+    provider.bluetoothInputDevices = [.airPodsMax(), .airPods()]
+
+    XCTAssertEqual(engine.availableMics, [.airPodsMax(), .airPods()])
+  }
+
+  // MARK: - Mic selection
+
+  func testSelectingMicSwitchesWarmingAndPersists() {
+    provider.bluetoothInputDevices = [.airPods(), .airPodsMax()]
+    provider.defaultInputDevice = .airPods()
+    engine.start()
+    XCTAssertEqual(engine.state, .warming(.airPods()))
+
+    engine.selectMic(uid: AudioInputDevice.airPodsMax().uid)
+
+    XCTAssertEqual(engine.state, .warming(.airPodsMax()))
+    XCTAssertEqual(
+      warmer.startedDevices.map(\.uid),
+      [AudioInputDevice.airPods().uid, AudioInputDevice.airPodsMax().uid])
+    XCTAssertEqual(settings.selectedMicUID, AudioInputDevice.airPodsMax().uid)
+  }
+
+  func testSelectedMicOverridesDefaultInput() {
+    settings.selectedMicUID = AudioInputDevice.airPodsMax().uid
+    provider.bluetoothInputDevices = [.airPods(), .airPodsMax()]
+    provider.defaultInputDevice = .airPods()
+
+    engine.start()
+
+    XCTAssertEqual(engine.state, .warming(.airPodsMax()))
+  }
+
+  func testDisconnectedSelectionFallsBackToConnectedMic() {
+    settings.selectedMicUID = AudioInputDevice.airPodsMax().uid
+    provider.bluetoothInputDevices = [.airPods()]
+    provider.defaultInputDevice = nil
+
+    engine.start()
+
+    XCTAssertEqual(engine.state, .warming(.airPods()))
+    XCTAssertEqual(
+      settings.selectedMicUID, AudioInputDevice.airPodsMax().uid,
+      "selection should be remembered for when the mic reconnects")
+  }
+
+  func testSelectionAppliesAgainWhenMicReconnects() {
+    settings.selectedMicUID = AudioInputDevice.airPodsMax().uid
+    provider.bluetoothInputDevices = [.airPods()]
+    engine.start()
+    XCTAssertEqual(engine.state, .warming(.airPods()))
+
+    provider.bluetoothInputDevices = [.airPods(), .airPodsMax()]
+    engine.deviceEventOccurred()
+    scheduler.fireLastOneShot()
+
+    XCTAssertEqual(engine.state, .warming(.airPodsMax()))
+  }
+
   // MARK: - Device changes (debounced)
 
   func testFollowsDefaultInputChangeAfterSettleDelay() {
+    provider.bluetoothInputDevices = [.airPods(), .airPodsMax()]
+    provider.defaultInputDevice = .airPods()
     engine.start()
 
-    provider.defaultInputDevice = .airPods(id: 99)
+    provider.defaultInputDevice = .airPodsMax()
     engine.deviceEventOccurred()
     XCTAssertEqual(engine.state, .warming(.airPods()), "should not switch before settle delay")
 
     scheduler.fireLastOneShot()
 
-    XCTAssertEqual(engine.state, .warming(.airPods(id: 99)))
-    XCTAssertEqual(warmer.startedDevices.map(\.id), [42, 99])
+    XCTAssertEqual(engine.state, .warming(.airPodsMax()))
     XCTAssertEqual(warmer.stopCount, 1)
   }
 
@@ -102,12 +175,14 @@ final class KeepWarmEngineTests: XCTestCase {
       scheduler.pendingOneShots.count, 1, "earlier debounce timers should be cancelled")
   }
 
-  func testTransientNilDefaultInputDuringHandoffIsAbsorbed() {
+  func testTransientDisappearanceDuringHandoffIsAbsorbed() {
     engine.start()
 
     // Bluetooth handoff: device momentarily vanishes, then returns.
+    provider.bluetoothInputDevices = []
     provider.defaultInputDevice = nil
     engine.deviceEventOccurred()
+    provider.bluetoothInputDevices = [.airPods()]
     provider.defaultInputDevice = .airPods()
     engine.deviceEventOccurred()
 
@@ -121,24 +196,14 @@ final class KeepWarmEngineTests: XCTestCase {
   func testDeviceDisappearanceStopsWarming() {
     engine.start()
 
+    provider.bluetoothInputDevices = []
     provider.defaultInputDevice = nil
     engine.deviceEventOccurred()
     scheduler.fireLastOneShot()
 
-    XCTAssertEqual(engine.state, .noInputDevice)
+    XCTAssertEqual(engine.state, .noBluetoothMic)
     XCTAssertNil(warmer.warmedDeviceID)
     XCTAssertEqual(warmer.stopCount, 1)
-  }
-
-  func testSwitchToIneligibleDeviceStopsWarming() {
-    engine.start()
-
-    provider.defaultInputDevice = .builtIn()
-    engine.deviceEventOccurred()
-    scheduler.fireLastOneShot()
-
-    XCTAssertEqual(engine.state, .ineligibleDevice(.builtIn()))
-    XCTAssertNil(warmer.warmedDeviceID)
   }
 
   // MARK: - Pause / resume
@@ -269,6 +334,7 @@ final class KeepWarmEngineTests: XCTestCase {
     XCTAssertEqual(engine.state, .warming(.airPods()))
 
     // Force a restart that fails again: backoff should start over at 1s.
+    provider.bluetoothInputDevices = [.airPods(id: 50)]
     provider.defaultInputDevice = .airPods(id: 50)
     engine.deviceEventOccurred()
     scheduler.fireLastOneShot()
