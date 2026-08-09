@@ -8,14 +8,19 @@ enum MenuBarIcon {
   static let idle: NSImage = make(steaming: false)
 
   private static let canvas = NSSize(width: 18, height: 18)
-  /// The mic glyph is the same size in both states; only the steam differs.
-  private static let scale: CGFloat = 1.2
+  /// Mic glyph height in unit coordinates (base bar to capsule top).
+  private static let micUnits: CGFloat = 9.9
+  /// Extra units above the mic for the steam (gap + wisps).
+  private static let steamUnits: CGFloat = 3.9
 
   private static func make(steaming: Bool) -> NSImage {
+    // Without steam, the mic grows to fill the vertical space the steam
+    // otherwise occupies; with steam, the mic shrinks to make room for it.
+    let contentUnits = steaming ? micUnits + steamUnits : micUnits
+    let scale = steaming ? 1.2 : 1.55
+    let baseY = (canvas.height - contentUnits * scale) / 2
     let image = NSImage(size: canvas, flipped: false) { _ in
-      // With steam the composition is taller, so the mic sits lower to keep
-      // the whole glyph optically centered in the menu bar.
-      draw(baseY: steaming ? 0.7 : 3.0, steaming: steaming)
+      draw(baseY: baseY, scale: scale, steaming: steaming)
       return true
     }
     image.isTemplate = true
@@ -25,10 +30,12 @@ enum MenuBarIcon {
   /// Draws the mic with its base bar at `baseY`. Geometry is authored in
   /// unit coordinates around the center line (x 0) and the base (y 0), then
   /// scaled. Template images only use alpha, so everything is black.
-  private static func draw(baseY: CGFloat, steaming: Bool) {
+  private static func draw(baseY: CGFloat, scale: CGFloat, steaming: Bool) {
     func at(_ dx: CGFloat, _ dy: CGFloat) -> NSPoint {
       NSPoint(x: 9 + dx * scale, y: baseY + dy * scale)
     }
+    // Strokes scale with the glyph so proportions match between states.
+    let strokeWidth = 1.25 * scale
 
     NSColor.black.setFill()
     NSColor.black.setStroke()
@@ -41,7 +48,7 @@ enum MenuBarIcon {
     capsule.fill()
 
     let yoke = NSBezierPath()
-    yoke.lineWidth = 1.5
+    yoke.lineWidth = strokeWidth
     yoke.lineCapStyle = .round
     yoke.move(to: at(-3.9, 5.9))
     yoke.line(to: at(-3.9, 5.1))
@@ -52,14 +59,14 @@ enum MenuBarIcon {
     yoke.stroke()
 
     let stem = NSBezierPath()
-    stem.lineWidth = 1.5
+    stem.lineWidth = strokeWidth
     stem.lineCapStyle = .round
     stem.move(to: at(0, 1.2))
     stem.line(to: at(0, 0))
     stem.stroke()
 
     let base = NSBezierPath()
-    base.lineWidth = 1.5
+    base.lineWidth = strokeWidth
     base.lineCapStyle = .round
     base.move(to: at(-3.5, 0))
     base.line(to: at(3.5, 0))
