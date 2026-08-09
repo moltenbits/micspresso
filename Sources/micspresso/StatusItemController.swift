@@ -30,10 +30,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     let mics = engine.availableMics
     if !mics.isEmpty {
-      let header = NSMenuItem(title: "Keep Awake", action: nil, keyEquivalent: "")
-      header.isEnabled = false
-      menu.addItem(header)
-
       for mic in mics {
         let item = NSMenuItem(title: mic.name, action: #selector(selectMic(_:)), keyEquivalent: "")
         item.target = self
@@ -62,7 +58,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     menu.addItem(.separator())
 
     let toggle = NSMenuItem(
-      title: engine.isEnabled ? "Pause Keeping Awake" : "Resume Keeping Awake",
+      title: engine.isEnabled ? "Pause Micspresso" : "Resume Micspresso",
       action: #selector(toggleEnabled), keyEquivalent: "")
     toggle.target = self
     menu.addItem(toggle)

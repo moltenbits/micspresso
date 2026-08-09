@@ -56,12 +56,12 @@ the menu bar — filled while a mic is being kept warm, outlined otherwise.
 
 Everything lives in the menu bar menu:
 
-- **Keep Awake** — a list of your connected Bluetooth mics; the checked one
-  is being kept awake. Click another to switch. With no selection, Micspresso
+- Your connected Bluetooth mics are listed at the top; the checked one is
+  being kept awake. Click another to switch. With no selection, Micspresso
   follows the system default input (or the first available Bluetooth mic),
   and a disconnected pick falls back to whatever's still connected until it
   returns.
-- **Pause / Resume Keeping Awake** — one click to get out of the way.
+- **Pause / Resume Micspresso** — one click to get out of the way.
 - **Launch at Login**
 
 The CLI binary also answers `--version` and `--help`.
