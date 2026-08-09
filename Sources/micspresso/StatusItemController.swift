@@ -88,21 +88,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     menu.addItem(quit)
   }
 
-  private func icon(for state: EngineState) -> NSImage? {
-    let symbolName: String
+  private func icon(for state: EngineState) -> NSImage {
     switch state {
     case .warming:
-      symbolName = "cup.and.saucer.fill"
+      return MenuBarIcon.active
     default:
-      symbolName = "cup.and.saucer"
+      return MenuBarIcon.idle
     }
-    let image =
-      NSImage(systemSymbolName: symbolName, accessibilityDescription: "Micspresso")
-      ?? NSImage(
-        systemSymbolName: state == .paused ? "mic" : "mic.fill",
-        accessibilityDescription: "Micspresso")
-    image?.isTemplate = true
-    return image
   }
 
   private func statusLine(for state: EngineState) -> String {
