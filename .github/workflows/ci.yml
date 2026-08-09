@@ -39,16 +39,18 @@ jobs:
       # Release bundling catches plist/signing/layout regressions. Audio HAL
       # behavior can't be exercised on GitHub-hosted runners (no real input
       # devices or TCC grants), so the smoke tests stay on CLI paths.
+      # CI has no distribution credentials, so bundle.sh produces the dev
+      # bundle name — the same artifact a local `make bundle-release` makes.
       - name: Release bundle + CLI smoke test
         run: |
           chmod +x scripts/*.sh
           ./scripts/bundle.sh release
-          test -x .build/release/Micspresso.app/Contents/MacOS/micspresso
-          test -f .build/release/Micspresso.app/Contents/Info.plist
-          test -f .build/release/Micspresso.app/Contents/Resources/AppIcon.icns
-          codesign --verify --deep --strict .build/release/Micspresso.app
-          .build/release/Micspresso.app/Contents/MacOS/micspresso --version
-          .build/release/Micspresso.app/Contents/MacOS/micspresso --help
+          test -x ".build/release/Micspresso Dev.app/Contents/MacOS/micspresso"
+          test -f ".build/release/Micspresso Dev.app/Contents/Info.plist"
+          test -f ".build/release/Micspresso Dev.app/Contents/Resources/AppIcon.icns"
+          codesign --verify --deep --strict ".build/release/Micspresso Dev.app"
+          ".build/release/Micspresso Dev.app/Contents/MacOS/micspresso" --version
+          ".build/release/Micspresso Dev.app/Contents/MacOS/micspresso" --help
 
   lint:
     name: Lint

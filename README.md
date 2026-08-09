@@ -115,10 +115,15 @@ a tested, componentized core.
 ```bash
 make test            # run the unit tests
 make run             # build a debug bundle and run it
-make bundle-release  # release app bundle (ad-hoc signed without .env)
+make bundle-release  # release app bundle ("Micspresso Dev.app" without .env)
 make lint            # swift-format lint
 make help            # everything else
 ```
+
+Local builds are a separate "Micspresso Dev" app (own bundle ID and TCC
+records), signed with a local dev certificate when one exists so the mic
+permission survives rebuilds — see
+[docs/distribution.md](docs/distribution.md).
 
 Releases are cut by pushing a `v*` tag; GitHub Actions builds, signs,
 notarizes, publishes the release, and updates the Homebrew cask. See

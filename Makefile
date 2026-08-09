@@ -3,6 +3,11 @@
 SWIFT_BUILD_FLAGS = --disable-sandbox
 APP_INSTALL_PATH = /Applications
 
+# Local (non-distribution) bundles are a separate "Dev" app — distinct name,
+# bundle id, and TCC records from the notarized release. Only builds with
+# Developer ID credentials (.env / CI secrets) produce plain "Micspresso.app".
+DEV_APP = Micspresso Dev.app
+
 help: ## This help screen
 	@IFS=$$'\n' ; \
 	help_lines=(`fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##/:/'`); \
@@ -41,26 +46,26 @@ clean: ## Clean build artifacts
 	swift package clean
 	rm -rf .build dist
 
-install: ## Install app bundle to /Applications (may require sudo)
+install: ## Install dev app bundle to /Applications (may require sudo)
 install: bundle-release
-	@echo "Installing Micspresso.app to $(APP_INSTALL_PATH)..."
+	@echo "Installing $(DEV_APP) to $(APP_INSTALL_PATH)..."
 	@if [ -w $(APP_INSTALL_PATH) ]; then \
-		rm -rf $(APP_INSTALL_PATH)/Micspresso.app; \
-		cp -r .build/release/Micspresso.app $(APP_INSTALL_PATH)/; \
+		rm -rf "$(APP_INSTALL_PATH)/$(DEV_APP)"; \
+		cp -r ".build/release/$(DEV_APP)" $(APP_INSTALL_PATH)/; \
 	else \
-		sudo rm -rf $(APP_INSTALL_PATH)/Micspresso.app; \
-		sudo cp -r .build/release/Micspresso.app $(APP_INSTALL_PATH)/; \
+		sudo rm -rf "$(APP_INSTALL_PATH)/$(DEV_APP)"; \
+		sudo cp -r ".build/release/$(DEV_APP)" $(APP_INSTALL_PATH)/; \
 	fi
-	@echo "Installed! Launch with: open $(APP_INSTALL_PATH)/Micspresso.app"
+	@echo "Installed! Launch with: open '$(APP_INSTALL_PATH)/$(DEV_APP)'"
 
-uninstall: ## Uninstall from /Applications (may require sudo)
-	@rm -rf $(APP_INSTALL_PATH)/Micspresso.app 2>/dev/null || \
-		sudo rm -rf $(APP_INSTALL_PATH)/Micspresso.app
-	@echo "Uninstalled Micspresso"
+uninstall: ## Uninstall dev app from /Applications (may require sudo)
+	@rm -rf "$(APP_INSTALL_PATH)/$(DEV_APP)" 2>/dev/null || \
+		sudo rm -rf "$(APP_INSTALL_PATH)/$(DEV_APP)"
+	@echo "Uninstalled $(DEV_APP)"
 
 run: ## Run the debug build (via app bundle)
 run: bundle
-	.build/debug/Micspresso.app/Contents/MacOS/micspresso
+	".build/debug/$(DEV_APP)/Contents/MacOS/micspresso"
 
 format: ## Format code (requires swift-format)
 	swift-format -i -r Sources/ Tests/

@@ -64,8 +64,24 @@ spctl --assess --type execute --verbose .build/release/Micspresso.app
 # Expect: "accepted" and "source=Notarized Developer ID"
 ```
 
-Without `.env`, `make bundle-release` produces an ad-hoc-signed bundle that
-works on your own machine only.
+## Local dev builds and TCC
+
+Builds without Developer ID credentials produce a separate dev app —
+**"Micspresso Dev.app"** with bundle ID `com.moltenbits.micspresso.dev` — so
+dev and release builds never share TCC permission records. (Reusing one
+bundle ID across different signatures leaves stale mismatched TCC entries
+that suppress prompts or block launches.)
+
+Dev bundles are signed with the first available local code-signing
+certificate — `Micspresso Dev`, then `Spacebar Dev` — falling back to ad-hoc
+when neither exists. A real (even self-signed) certificate matters: TCC keys
+the microphone grant to the app's designated requirement, and an ad-hoc
+signature's requirement is the binary's cdhash, which changes every rebuild
+and re-prompts every time. A certificate-signed dev build prompts once, ever.
+
+To create the cert on a new machine: Keychain Access → Certificate Assistant
+→ Create a Certificate… → name `Micspresso Dev`, type **Code Signing**. You
+can also set `SIGN_IDENTITY=<cert name>` in `.env` to use any other identity.
 
 ## GitHub Actions release setup
 

@@ -18,10 +18,17 @@ fi
 
 echo "Building Micspresso v$VERSION for release..."
 
-# Signs with Developer ID if TEAM_NAME/TEAM_ID env vars are set.
+# Signs with Developer ID if TEAM_NAME/TEAM_ID env vars are set. Without
+# them bundle.sh produces the dev-identity bundle ("Micspresso Dev.app") —
+# useful for exercising this script, but not a shippable artifact.
 VERSION="$VERSION" "$SCRIPT_DIR/bundle.sh" release
 
-APP_BUNDLE="$BUILD_DIR/release/Micspresso.app"
+if [[ -n "${TEAM_NAME:-}" && -n "${TEAM_ID:-}" ]]; then
+    APP_NAME="Micspresso"
+else
+    APP_NAME="Micspresso Dev"
+fi
+APP_BUNDLE="$BUILD_DIR/release/$APP_NAME.app"
 
 # Notarize if credentials are available, otherwise skip (e.g. source builds).
 if [[ -n "${TEAM_ID:-}" && -n "${APPLE_ID:-}" && -n "${APPLE_APP_PASSWORD:-}" ]]; then
@@ -57,7 +64,7 @@ ARCHIVE_PATH="$DIST_DIR/$ARCHIVE_NAME"
 echo ""
 echo "Creating archive: $ARCHIVE_NAME"
 cd "$BUILD_DIR/release"
-tar -czf "$ARCHIVE_PATH" Micspresso.app
+tar -czf "$ARCHIVE_PATH" "$APP_NAME.app"
 
 SHA256=$(shasum -a 256 "$ARCHIVE_PATH" | cut -d' ' -f1)
 
