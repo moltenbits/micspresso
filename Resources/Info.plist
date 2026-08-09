@@ -22,6 +22,8 @@
 	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 MoltenBits</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Micspresso holds your microphone open (without recording anything) so it responds instantly when you start dictating or talking.</string>
 </dict>

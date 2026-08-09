@@ -78,10 +78,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     menu.addItem(.separator())
 
-    let version = NSMenuItem(
-      title: "Micspresso \(AppInfo.version)", action: nil, keyEquivalent: "")
-    version.isEnabled = false
-    menu.addItem(version)
+    let about = NSMenuItem(
+      title: "About Micspresso", action: #selector(showAbout), keyEquivalent: "")
+    about.target = self
+    menu.addItem(about)
 
     let quit = NSMenuItem(
       title: "Quit Micspresso", action: #selector(NSApplication.terminate(_:)),
@@ -143,6 +143,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
   @objc private func selectMic(_ sender: NSMenuItem) {
     guard let uid = sender.representedObject as? String else { return }
     engine.selectMic(uid: uid)
+  }
+
+  @objc private func showAbout() {
+    AboutPanel.show()
   }
 
   @objc private func toggleLaunchAtLogin() {
