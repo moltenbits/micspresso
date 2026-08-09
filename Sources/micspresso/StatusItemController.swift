@@ -3,11 +3,13 @@ import MicspressoCore
 
 final class StatusItemController: NSObject, NSMenuDelegate {
   private let engine: KeepWarmEngine
+  private let openSettings: () -> Void
   private let statusItem: NSStatusItem
   private var currentState: EngineState = .paused
 
-  init(engine: KeepWarmEngine) {
+  init(engine: KeepWarmEngine, openSettings: @escaping () -> Void) {
     self.engine = engine
+    self.openSettings = openSettings
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     super.init()
 
@@ -65,19 +67,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     menu.addItem(.separator())
 
-    let launchAtLogin = NSMenuItem(
-      title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-    launchAtLogin.target = self
-    launchAtLogin.state = LaunchAtLogin.isEnabled ? .on : .off
-    launchAtLogin.isEnabled = LaunchAtLogin.isAvailable
-    menu.addItem(launchAtLogin)
+    let settings = NSMenuItem(
+      title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+    settings.target = self
+    menu.addItem(settings)
 
     menu.addItem(.separator())
-
-    let about = NSMenuItem(
-      title: "About Micspresso", action: #selector(showAbout), keyEquivalent: "")
-    about.target = self
-    menu.addItem(about)
 
     // Custom selector on purpose: on macOS Tahoe, AppKit auto-attaches an
     // SF Symbol to items with system-known selectors like terminate(_:),
@@ -136,16 +131,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     engine.selectMic(uid: uid)
   }
 
-  @objc private func showAbout() {
-    AboutPanel.show()
+  @objc private func showSettings() {
+    openSettings()
   }
 
   @objc private func quitApp() {
     NSApp.terminate(nil)
-  }
-
-  @objc private func toggleLaunchAtLogin() {
-    LaunchAtLogin.toggle()
   }
 
   @objc private func openPrivacySettings() {

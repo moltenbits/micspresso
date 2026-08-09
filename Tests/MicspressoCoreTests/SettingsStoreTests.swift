@@ -22,6 +22,19 @@ final class SettingsStoreTests: XCTestCase {
 
     XCTAssertTrue(store.enabled)
     XCTAssertNil(store.selectedMicUID)
+    XCTAssertNil(store.toggleShortcut)
+  }
+
+  func testPersistsToggleShortcut() {
+    let store = UserDefaultsSettingsStore(defaults: defaults)
+    store.toggleShortcut = ToggleShortcut(keyCode: 46, modifiers: [.command, .shift])
+
+    let reloaded = UserDefaultsSettingsStore(defaults: defaults)
+    XCTAssertEqual(
+      reloaded.toggleShortcut, ToggleShortcut(keyCode: 46, modifiers: [.command, .shift]))
+
+    reloaded.toggleShortcut = nil
+    XCTAssertNil(UserDefaultsSettingsStore(defaults: defaults).toggleShortcut)
   }
 
   func testPersistsSelectedMicUID() {

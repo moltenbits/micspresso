@@ -63,7 +63,9 @@ Everything lives in the menu bar menu:
   and a disconnected pick falls back to whatever's still connected until it
   returns.
 - **Pause / Resume Micspresso** — one click to get out of the way.
-- **Launch at Login**
+- **Settings…** — launch at login, a global keyboard shortcut that toggles
+  Micspresso from anywhere (no Accessibility permission needed), and the
+  About info.
 
 The CLI binary also answers `--version` and `--help`.
 

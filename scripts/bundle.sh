@@ -61,21 +61,24 @@ else
     APP_NAME="Micspresso Dev"
 fi
 
-# Distribution builds carry the tag-derived version. Dev builds stamp a build
-# timestamp onto the latest release version — <tag>.<YY>.<MM>.<DD>.<minute of
-# day> — so the About panel makes it unmistakable which build is running.
+# Distribution builds carry the tag-derived version in both fields. Dev
+# builds keep the plain latest-release version (CFBundleShortVersionString)
+# and put a build timestamp — <YY>.<MM>.<DD>.<minute of day> — in
+# CFBundleVersion, so About shows e.g. "1.0.0 (26.08.09.896)".
 if [[ -z "${VERSION:-}" ]]; then
     if [[ "$DISTRIBUTION_SIGNING" == true ]]; then
         VERSION="$(git -C "$PROJECT_DIR" describe --tags --always --dirty 2>/dev/null | sed 's/^v//')"
     else
         BASE_VERSION="$(git -C "$PROJECT_DIR" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)"
         MINUTE_OF_DAY=$((10#$(date +%H) * 60 + 10#$(date +%M)))
-        VERSION="${BASE_VERSION:-0.0.0}.$(date +%y.%m.%d).${MINUTE_OF_DAY}"
+        VERSION="${BASE_VERSION:-0.0.0}"
+        BUILD="$(date +%y.%m.%d).${MINUTE_OF_DAY}"
     fi
 fi
 VERSION="${VERSION:-0.0.0-dev}"
+BUILD="${BUILD:-$VERSION}"
 
-echo "Building $APP_NAME ($BUILD_CONFIG, version $VERSION)..."
+echo "Building $APP_NAME ($BUILD_CONFIG, version $VERSION, build $BUILD)..."
 cd "$PROJECT_DIR"
 swift build -c "$BUILD_CONFIG" --disable-sandbox
 
@@ -95,7 +98,7 @@ cp "$RESOURCES_DIR/Info.plist" "$CONTENTS_DIR/Info.plist"
 # (AppInfo.version), so CFBundleShortVersionString is the single source of
 # truth for --version.
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$CONTENTS_DIR/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$CONTENTS_DIR/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$CONTENTS_DIR/Info.plist"
 
 if [[ "$DISTRIBUTION_SIGNING" != true ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.moltenbits.micspresso.dev" \
