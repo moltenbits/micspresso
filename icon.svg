@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7a4f35"/>
+      <stop offset="1" stop-color="#34201a"/>
+    </linearGradient>
+    <linearGradient id="cream" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdf6ec"/>
+      <stop offset="1" stop-color="#e3d0b8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- macOS-style squircle background -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)"/>
+
+  <!-- steam: the mic is hot -->
+  <g fill="none" stroke="#f5e9dc" stroke-linecap="round">
+    <path d="M 512 338 C 478 300, 548 258, 512 208" stroke-width="30" opacity="0.95"/>
+    <path d="M 424 330 C 396 298, 452 264, 424 226" stroke-width="26" opacity="0.55"/>
+    <path d="M 600 330 C 572 298, 628 264, 600 226" stroke-width="26" opacity="0.55"/>
+  </g>
+
+  <!-- microphone capsule -->
+  <rect x="427" y="392" width="170" height="252" rx="85" fill="url(#cream)"/>
+  <!-- grille lines -->
+  <g stroke="#4a2c1d" stroke-width="14" stroke-linecap="round" opacity="0.25">
+    <path d="M 447 462 L 577 462"/>
+    <path d="M 447 510 L 577 510"/>
+  </g>
+
+  <!-- yoke -->
+  <path d="M 362 570 L 362 590 A 150 150 0 0 0 662 590 L 662 570"
+        fill="none" stroke="#f5e9dc" stroke-width="36" stroke-linecap="round"/>
+  <!-- stem -->
+  <path d="M 512 740 L 512 786" stroke="#f5e9dc" stroke-width="36" stroke-linecap="round"/>
+
+  <!-- saucer -->
+  <path d="M 302 812
+           Q 302 790 332 790
+           L 692 790
+           Q 722 790 722 812
+           Q 722 834 692 834
+           L 332 834
+           Q 302 834 302 812
+           Z"
+        fill="#f5e9dc"/>
+</svg>
