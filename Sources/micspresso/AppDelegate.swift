@@ -5,17 +5,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var engine: KeepWarmEngine!
   private var monitor: CoreAudioInputMonitor!
   private var statusItemController: StatusItemController!
+  private var settingsWindowController: SettingsWindowController!
+  private var hotkeyManager: HotkeyManager!
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    let settings = UserDefaultsSettingsStore()
     monitor = CoreAudioInputMonitor()
     engine = KeepWarmEngine(
       provider: monitor,
       warmer: CoreAudioMicWarmer(),
       permission: AVCaptureMicPermission(),
-      settings: UserDefaultsSettingsStore(),
+      settings: settings,
       scheduler: MainQueueScheduler()
     )
-    statusItemController = StatusItemController(engine: engine)
+
+    hotkeyManager = HotkeyManager()
+    hotkeyManager.onToggle = { [weak self] in
+      guard let self else { return }
+      self.engine.setEnabled(!self.engine.isEnabled)
+    }
+    hotkeyManager.apply(settings.toggleShortcut)
+
+    settingsWindowController = SettingsWindowController(settings: settings) {
+      [weak self] shortcut in
+      self?.hotkeyManager.apply(shortcut)
+    }
+    statusItemController = StatusItemController(engine: engine) { [weak self] in
+      self?.settingsWindowController.show()
+    }
 
     engine.onStateChange = { [weak self] state in
       self?.statusItemController.update(for: state)

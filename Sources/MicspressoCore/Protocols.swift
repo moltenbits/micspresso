@@ -39,6 +39,8 @@ public protocol SettingsStoring: AnyObject {
   /// UID of the mic the user chose to keep awake; nil means auto
   /// (prefer the default input, then the first available Bluetooth mic).
   var selectedMicUID: String? { get set }
+  /// Global keyboard shortcut that toggles keep-awake; nil means none set.
+  var toggleShortcut: ToggleShortcut? { get set }
 }
 
 public protocol EngineTimer: AnyObject {

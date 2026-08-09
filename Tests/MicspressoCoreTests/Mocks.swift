@@ -68,6 +68,7 @@ final class MockMicPermission: MicPermissionChecking {
 final class MockSettingsStore: SettingsStoring {
   var enabled: Bool
   var selectedMicUID: String?
+  var toggleShortcut: ToggleShortcut?
 
   init(enabled: Bool = true, selectedMicUID: String? = nil) {
     self.enabled = enabled
