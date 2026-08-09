@@ -3,7 +3,7 @@ import MicspressoCore
 
 switch CLIArgs.parse(Array(CommandLine.arguments.dropFirst())) {
 case .version:
-  print(AppInfo.version)
+  print(AppInfo.displayVersion)
   exit(0)
 case .help:
   print(CLIArgs.helpText)

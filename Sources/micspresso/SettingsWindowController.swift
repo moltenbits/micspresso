@@ -132,7 +132,7 @@ struct AboutPane: View {
         .font(.title2)
         .fontWeight(.semibold)
 
-      Text("Version \(AppInfo.version)")
+      Text("Version \(AppInfo.displayVersion)")
         .font(.caption)
         .foregroundStyle(.secondary)
 
