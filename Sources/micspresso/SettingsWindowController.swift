@@ -8,6 +8,9 @@ final class SettingsWindowController {
   private let settings: SettingsStoring
   private let onShortcutChange: (ToggleShortcut?) -> Void
 
+  private static let windowWidth: CGFloat = 540
+  private static let sidebarWidth: CGFloat = 150
+
   init(settings: SettingsStoring, onShortcutChange: @escaping (ToggleShortcut?) -> Void) {
     self.settings = settings
     self.onShortcutChange = onShortcutChange
@@ -20,21 +23,25 @@ final class SettingsWindowController {
       return
     }
 
+    // Size the window so the General pane fits without scrolling; the
+    // sidebar and the About pane stretch to whatever height that yields.
+    let contentWidth = Self.windowWidth - Self.sidebarWidth - 1
+    let probe = NSHostingView(
+      rootView: GeneralPane(settings: settings, onShortcutChange: onShortcutChange)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: contentWidth))
+    let height = max(probe.fittingSize.height, 320)
+
     let view = SettingsView(settings: settings, onShortcutChange: onShortcutChange)
-    let hostingView = NSHostingView(rootView: view)
-    // Size the window to the content's ideal size — the panes report their
-    // full height (no internal scrolling) via fixedSize. The floor guards
-    // against a degenerate measurement.
-    let fitting = hostingView.fittingSize
-    let contentSize = NSSize(width: max(fitting.width, 420), height: max(fitting.height, 260))
     let newWindow = NSWindow(
-      contentRect: NSRect(origin: .zero, size: contentSize),
+      contentRect: NSRect(
+        origin: .zero, size: NSSize(width: Self.windowWidth, height: height)),
       styleMask: [.titled, .closable],
       backing: .buffered,
       defer: false
     )
     newWindow.title = "Micspresso Settings"
-    newWindow.contentView = hostingView
+    newWindow.contentView = NSHostingView(rootView: view)
     newWindow.center()
     newWindow.isReleasedWhenClosed = false
     newWindow.makeKeyAndOrderFront(nil)
@@ -54,21 +61,59 @@ final class SettingsWindowController {
   }
 }
 
+// MARK: - Panes
+
+enum SettingsPane: String, CaseIterable, Identifiable {
+  case general
+  case about
+
+  var id: String { rawValue }
+
+  var label: String {
+    switch self {
+    case .general: return "General"
+    case .about: return "About"
+    }
+  }
+
+  var icon: String {
+    switch self {
+    case .general: return "gearshape"
+    case .about: return "info.circle"
+    }
+  }
+}
+
 struct SettingsView: View {
   let settings: SettingsStoring
   let onShortcutChange: (ToggleShortcut?) -> Void
 
+  @State private var selectedPane: SettingsPane = .general
+
   var body: some View {
-    TabView {
-      GeneralPane(settings: settings, onShortcutChange: onShortcutChange)
-        .tabItem { Label("General", systemImage: "gearshape") }
-      AboutPane()
-        .tabItem { Label("About", systemImage: "info.circle") }
+    HStack(spacing: 0) {
+      List(SettingsPane.allCases, selection: $selectedPane) { pane in
+        Label(pane.label, systemImage: pane.icon)
+          .tag(pane)
+      }
+      .listStyle(.sidebar)
+      .frame(width: 150)
+
+      Divider()
+
+      content
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
-    .frame(width: 420)
-    // Report the ideal height so the window can size to fit; the grouped
-    // form then never needs to scroll.
-    .fixedSize(horizontal: false, vertical: true)
+  }
+
+  @ViewBuilder
+  private var content: some View {
+    switch selectedPane {
+    case .general:
+      GeneralPane(settings: settings, onShortcutChange: onShortcutChange)
+    case .about:
+      AboutPane()
+    }
   }
 }
 
@@ -97,6 +142,9 @@ struct GeneralPane: View {
             LaunchAtLogin.toggle()
             launchAtLogin = LaunchAtLogin.isEnabled
           }
+        Text("Micspresso will start automatically when you log in.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
 
       Section {
@@ -115,7 +163,6 @@ struct GeneralPane: View {
             }
           }
         }
-      } footer: {
         Text("Pauses or resumes Micspresso from anywhere.")
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -126,6 +173,9 @@ struct GeneralPane: View {
           .onChange(of: debugLogging) { newValue in
             settings.debugLogging = newValue
           }
+        Text("Writes detailed diagnostics to the system log.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
         Button(exportingLogs ? "Exporting logs…" : "View Logs in Console…") {
           exportingLogs = true
           LogViewer.exportAndOpen { _ in
@@ -133,13 +183,9 @@ struct GeneralPane: View {
           }
         }
         .disabled(exportingLogs)
-      } footer: {
-        Text(
-          "Verbose logging writes detailed diagnostics to the system log. "
-            + "View Logs exports the last 24 hours of Micspresso's entries and opens them in Console."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        Text("Exports the last 24 hours of Micspresso's log entries and opens them in Console.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
     }
     .formStyle(.grouped)
