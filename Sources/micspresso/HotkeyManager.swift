@@ -1,6 +1,5 @@
 import Carbon.HIToolbox
 import MicspressoCore
-import os
 
 /// Registers the global toggle shortcut via Carbon's RegisterEventHotKey —
 /// the one global-hotkey mechanism that needs no Accessibility or Input
@@ -10,7 +9,7 @@ final class HotkeyManager {
 
   private var hotKeyRef: EventHotKeyRef?
   private var eventHandler: EventHandlerRef?
-  private let log = Logger(subsystem: "com.moltenbits.micspresso", category: "hotkey")
+  private let log = DiagnosticsLog(category: "hotkey")
 
   init() {
     var eventType = EventTypeSpec(
@@ -18,6 +17,7 @@ final class HotkeyManager {
     let callback: EventHandlerUPP = { _, _, userData in
       guard let userData else { return noErr }
       let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
+      manager.log.notice("Global shortcut pressed; toggling")
       manager.onToggle?()
       return noErr
     }
@@ -44,10 +44,11 @@ final class HotkeyManager {
     let status = RegisterEventHotKey(
       UInt32(shortcut.keyCode), shortcut.carbonModifiers, hotKeyID,
       GetApplicationEventTarget(), 0, &hotKeyRef)
-    if status != noErr {
+    if status == noErr {
+      log.notice("Registered global shortcut \(shortcut.displayString)")
+    } else {
       log.error(
-        "Could not register global shortcut \(shortcut.displayString, privacy: .public) (OSStatus \(status))"
-      )
+        "Could not register global shortcut \(shortcut.displayString) (OSStatus \(status))")
     }
   }
 

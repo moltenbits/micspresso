@@ -41,6 +41,8 @@ public protocol SettingsStoring: AnyObject {
   var selectedMicUID: String? { get set }
   /// Global keyboard shortcut that toggles keep-awake; nil means none set.
   var toggleShortcut: ToggleShortcut? { get set }
+  /// Promote verbose diagnostics into the persisted system log.
+  var debugLogging: Bool { get set }
 }
 
 public protocol EngineTimer: AnyObject {

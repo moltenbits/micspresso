@@ -6,6 +6,7 @@ public final class UserDefaultsSettingsStore: SettingsStoring {
     static let selectedMicUID = "selectedMicUID"
     static let shortcutKeyCode = "toggleShortcutKeyCode"
     static let shortcutModifiers = "toggleShortcutModifiers"
+    static let debugLogging = "debugLogging"
   }
 
   private let defaults: UserDefaults
@@ -22,6 +23,11 @@ public final class UserDefaultsSettingsStore: SettingsStoring {
   public var selectedMicUID: String? {
     get { defaults.string(forKey: Key.selectedMicUID) }
     set { defaults.set(newValue, forKey: Key.selectedMicUID) }
+  }
+
+  public var debugLogging: Bool {
+    get { defaults.bool(forKey: Key.debugLogging) }
+    set { defaults.set(newValue, forKey: Key.debugLogging) }
   }
 
   public var toggleShortcut: ToggleShortcut? {

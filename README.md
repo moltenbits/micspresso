@@ -102,6 +102,20 @@ The decision logic lives in `MicspressoCore` behind protocol seams
 `EngineScheduling`) and is fully unit-tested; the Core Audio implementations
 are thin adapters.
 
+## Logs
+
+Micspresso logs its decisions (state changes, which mic it's holding, hold
+rebuilds after device changes, stall recoveries) to the unified system log:
+
+```bash
+# /usr/bin/log explicitly — zsh shadows `log` with a shell builtin
+/usr/bin/log show --last 1h --predicate 'subsystem == "com.moltenbits.micspresso"'
+```
+
+For deeper diagnostics — raw device-change events, heartbeat ticks, retry
+scheduling — enable **Verbose logging** in Settings. Audio content is never
+logged; the app never reads any.
+
 ## Prior art
 
 Micspresso was inspired by [macos-mic-keepwarm](https://github.com/drewburchfield/macos-mic-keepwarm),

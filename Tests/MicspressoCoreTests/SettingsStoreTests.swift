@@ -23,6 +23,14 @@ final class SettingsStoreTests: XCTestCase {
     XCTAssertTrue(store.enabled)
     XCTAssertNil(store.selectedMicUID)
     XCTAssertNil(store.toggleShortcut)
+    XCTAssertFalse(store.debugLogging)
+  }
+
+  func testPersistsDebugLogging() {
+    let store = UserDefaultsSettingsStore(defaults: defaults)
+    store.debugLogging = true
+
+    XCTAssertTrue(UserDefaultsSettingsStore(defaults: defaults).debugLogging)
   }
 
   func testPersistsToggleShortcut() {

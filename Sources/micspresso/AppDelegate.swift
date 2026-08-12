@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     let settings = UserDefaultsSettingsStore()
+    DiagnosticsLog(category: "app").notice(
+      "Micspresso \(AppInfo.displayVersion) launched (pid \(ProcessInfo.processInfo.processIdentifier))"
+    )
     monitor = CoreAudioInputMonitor()
     engine = KeepWarmEngine(
       provider: monitor,

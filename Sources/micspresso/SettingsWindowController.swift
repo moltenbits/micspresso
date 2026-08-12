@@ -70,11 +70,13 @@ struct GeneralPane: View {
 
   @State private var launchAtLogin = LaunchAtLogin.isEnabled
   @State private var shortcut: ToggleShortcut?
+  @State private var debugLogging: Bool
 
   init(settings: SettingsStoring, onShortcutChange: @escaping (ToggleShortcut?) -> Void) {
     self.settings = settings
     self.onShortcutChange = onShortcutChange
     _shortcut = State(initialValue: settings.toggleShortcut)
+    _debugLogging = State(initialValue: settings.debugLogging)
   }
 
   var body: some View {
@@ -107,6 +109,17 @@ struct GeneralPane: View {
         }
       } footer: {
         Text("Pauses or resumes Micspresso from anywhere.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
+      Section {
+        Toggle("Verbose logging", isOn: $debugLogging)
+          .onChange(of: debugLogging) { newValue in
+            settings.debugLogging = newValue
+          }
+      } footer: {
+        Text("Writes detailed diagnostics to the system log, visible in Console.")
           .font(.caption)
           .foregroundStyle(.secondary)
       }
