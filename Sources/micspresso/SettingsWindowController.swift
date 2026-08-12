@@ -71,6 +71,7 @@ struct GeneralPane: View {
   @State private var launchAtLogin = LaunchAtLogin.isEnabled
   @State private var shortcut: ToggleShortcut?
   @State private var debugLogging: Bool
+  @State private var exportingLogs = false
 
   init(settings: SettingsStoring, onShortcutChange: @escaping (ToggleShortcut?) -> Void) {
     self.settings = settings
@@ -118,10 +119,20 @@ struct GeneralPane: View {
           .onChange(of: debugLogging) { newValue in
             settings.debugLogging = newValue
           }
+        Button(exportingLogs ? "Exporting logs…" : "View Logs in Console…") {
+          exportingLogs = true
+          LogViewer.exportAndOpen { _ in
+            exportingLogs = false
+          }
+        }
+        .disabled(exportingLogs)
       } footer: {
-        Text("Writes detailed diagnostics to the system log, visible in Console.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "Verbose logging writes detailed diagnostics to the system log. "
+            + "View Logs exports the last 24 hours of Micspresso's entries and opens them in Console."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       }
     }
     .formStyle(.grouped)
