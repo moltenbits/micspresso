@@ -92,7 +92,6 @@ struct GeneralPane: View {
         LabeledContent("Toggle shortcut") {
           HStack(spacing: 6) {
             ShortcutRecorderView(shortcut: $shortcut)
-              .fixedSize()
             if shortcut != nil {
               Button {
                 shortcut = nil
