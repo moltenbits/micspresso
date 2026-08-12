@@ -22,8 +22,13 @@ final class SettingsWindowController {
 
     let view = SettingsView(settings: settings, onShortcutChange: onShortcutChange)
     let hostingView = NSHostingView(rootView: view)
+    // Size the window to the content's ideal size — the panes report their
+    // full height (no internal scrolling) via fixedSize. The floor guards
+    // against a degenerate measurement.
+    let fitting = hostingView.fittingSize
+    let contentSize = NSSize(width: max(fitting.width, 420), height: max(fitting.height, 260))
     let newWindow = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 420, height: 260),
+      contentRect: NSRect(origin: .zero, size: contentSize),
       styleMask: [.titled, .closable],
       backing: .buffered,
       defer: false
@@ -60,7 +65,10 @@ struct SettingsView: View {
       AboutPane()
         .tabItem { Label("About", systemImage: "info.circle") }
     }
-    .frame(width: 420, height: 260)
+    .frame(width: 420)
+    // Report the ideal height so the window can size to fit; the grouped
+    // form then never needs to scroll.
+    .fixedSize(horizontal: false, vertical: true)
   }
 }
 
