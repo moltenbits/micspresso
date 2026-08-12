@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 public enum EngineState: Equatable {
   /// User has paused keeping warm.
@@ -18,6 +17,21 @@ public enum EngineState: Equatable {
   case warming(AudioInputDevice)
   /// Holding the device open failed; retrying with backoff.
   case warmingFailed(AudioInputDevice)
+}
+
+extension EngineState {
+  /// Compact form for the system log.
+  public var logDescription: String {
+    switch self {
+    case .paused: return "paused"
+    case .asleep: return "asleep"
+    case .awaitingPermission: return "awaiting mic permission"
+    case .permissionDenied: return "mic permission denied"
+    case .noBluetoothMic: return "no Bluetooth mic"
+    case .warming(let device): return "warming \(device.name) [\(device.id)]"
+    case .warmingFailed(let device): return "warming failed on \(device.name) [\(device.id)]"
+    }
+  }
 }
 
 /// Timing knobs, injectable for tests.
@@ -48,12 +62,13 @@ public final class KeepWarmEngine {
   private let settings: SettingsStoring
   private let scheduler: EngineScheduling
   private let timing: EngineTiming
-  private let log = Logger(subsystem: "com.moltenbits.micspresso", category: "engine")
+  private let log: DiagnosticsLog
 
   public var onStateChange: ((EngineState) -> Void)?
   public private(set) var state: EngineState = .paused {
     didSet {
       if state != oldValue {
+        log.notice("State: \(state.logDescription)")
         onStateChange?(state)
       }
     }
@@ -86,6 +101,7 @@ public final class KeepWarmEngine {
     self.settings = settings
     self.scheduler = scheduler
     self.timing = timing
+    self.log = DiagnosticsLog(category: "engine", isVerbose: { settings.debugLogging })
   }
 
   public func start() {
@@ -126,16 +142,28 @@ public final class KeepWarmEngine {
   /// Called on any HAL device-list or default-input change. Debounced,
   /// because one physical change fires several events.
   public func deviceEventOccurred() {
+    log.debug("Device change event; settling for \(timing.deviceSettleDelay)s")
     debounceTimer?.cancel()
     debounceTimer = scheduler.schedule(after: timing.deviceSettleDelay) { [weak self] in
       guard let self else { return }
       self.debounceTimer = nil
-      self.reconcile()
+      // Device changes always rebuild the hold, even when the same device
+      // resolves: AirPods multipoint hands the mic to a phone and back
+      // while keeping the same AudioDeviceID, and a hold that lived
+      // through that is a zombie on a dead link. Worse than useless — as
+      // long as it runs, other apps join the dead IO cycle instead of
+      // renegotiating the Bluetooth mic link, so the mic looks broken
+      // system-wide until the hold is released.
+      self.reconcile(rebuildingWarmHold: true)
     }
   }
 
   /// Re-evaluates what should be warm and makes it so.
   public func reconcile() {
+    reconcile(rebuildingWarmHold: false)
+  }
+
+  private func reconcile(rebuildingWarmHold: Bool) {
     retryTimer?.cancel()
     retryTimer = nil
 
@@ -173,8 +201,11 @@ public final class KeepWarmEngine {
     }
 
     if warmer.warmedDeviceID == device.id {
-      state = .warming(device)
-      return
+      if !rebuildingWarmHold {
+        state = .warming(device)
+        return
+      }
+      log.notice("Rebuilding hold on \(device.name) after device changes")
     }
 
     stopWarming()
@@ -183,13 +214,11 @@ public final class KeepWarmEngine {
       retryAttempts = 0
       resetHeartbeat()
       state = .warming(device)
-      log.info("Keeping \(device.name, privacy: .public) warm")
+      log.notice("Holding \(device.name) [\(device.id)] open")
     } catch {
       state = .warmingFailed(device)
       scheduleRetry()
-      log.error(
-        "Failed to warm \(device.name, privacy: .public): \(String(describing: error), privacy: .public)"
-      )
+      log.error("Failed to hold \(device.name): \(error)")
     }
   }
 
@@ -218,6 +247,7 @@ public final class KeepWarmEngine {
     retryAttempts += 1
     let exponential = timing.retryBaseDelay * pow(2.0, Double(retryAttempts - 1))
     let delay = min(exponential, timing.retryMaxDelay)
+    log.debug("Retrying in \(delay)s (attempt \(retryAttempts))")
     retryTimer = scheduler.schedule(after: delay) { [weak self] in
       self?.reconcile()
     }
@@ -237,10 +267,12 @@ public final class KeepWarmEngine {
     defer { lastDeliveryCount = count }
 
     guard count == lastDeliveryCount else {
+      log.debug("Heartbeat: \(count) IO callbacks delivered")
       stalledHeartbeats = 0
       return
     }
     stalledHeartbeats += 1
+    log.debug("Heartbeat: stalled at \(count) callbacks (\(stalledHeartbeats) ticks)")
     guard stalledHeartbeats >= timing.stalledTicksBeforeRestart else { return }
 
     log.warning("Warm session stalled (no IO callbacks); restarting")

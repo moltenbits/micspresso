@@ -175,10 +175,27 @@ final class KeepWarmEngineTests: XCTestCase {
       scheduler.pendingOneShots.count, 1, "earlier debounce timers should be cancelled")
   }
 
-  func testTransientDisappearanceDuringHandoffIsAbsorbed() {
+  func testDeviceEventRebuildsHoldEvenForSameDevice() {
+    engine.start()
+    XCTAssertEqual(warmer.startedDevices.count, 1)
+
+    // AirPods multipoint: a phone call takes the AirPods and gives them
+    // back with the same AudioDeviceID. A hold that lived through that is
+    // a zombie attached to a dead link — and it blocks every other app's
+    // mic from renegotiating — so the settle reconcile must always rebuild.
+    engine.deviceEventOccurred()
+    scheduler.fireLastOneShot()
+
+    XCTAssertEqual(engine.state, .warming(.airPods()))
+    XCTAssertEqual(warmer.stopCount, 1)
+    XCTAssertEqual(warmer.startedDevices.count, 2)
+  }
+
+  func testDeviceEventStormRebuildsHoldExactlyOnce() {
     engine.start()
 
-    // Bluetooth handoff: device momentarily vanishes, then returns.
+    // Bluetooth handoff: device momentarily vanishes, then returns. The
+    // debounce absorbs the storm into a single rebuild.
     provider.bluetoothInputDevices = []
     provider.defaultInputDevice = nil
     engine.deviceEventOccurred()
@@ -189,8 +206,8 @@ final class KeepWarmEngineTests: XCTestCase {
     scheduler.fireLastOneShot()
 
     XCTAssertEqual(engine.state, .warming(.airPods()))
-    XCTAssertEqual(warmer.startedDevices.count, 1, "same device should not be restarted")
-    XCTAssertEqual(warmer.stopCount, 0)
+    XCTAssertEqual(warmer.stopCount, 1)
+    XCTAssertEqual(warmer.startedDevices.count, 2)
   }
 
   func testDeviceDisappearanceStopsWarming() {
