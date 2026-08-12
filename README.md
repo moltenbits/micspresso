@@ -112,9 +112,10 @@ rebuilds after device changes, stall recoveries) to the unified system log:
 /usr/bin/log show --last 1h --predicate 'subsystem == "com.moltenbits.micspresso"'
 ```
 
-For deeper diagnostics — raw device-change events, heartbeat ticks, retry
-scheduling — enable **Verbose logging** in Settings. Audio content is never
-logged; the app never reads any.
+The Settings window's **Logging** pane shows the last 24 hours of entries
+in-app and can save them to a file; **Verbose logging** there adds deeper
+diagnostics (raw device-change events, heartbeat ticks, retry scheduling).
+Audio content is never logged; the app never reads any.
 
 ## Prior art
 

@@ -23,14 +23,21 @@ final class SettingsWindowController {
       return
     }
 
-    // Size the window so the General pane fits without scrolling; the
+    // Size the window so the tallest form pane fits without scrolling; the
     // sidebar and the About pane stretch to whatever height that yields.
     let contentWidth = Self.windowWidth - Self.sidebarWidth - 1
-    let probe = NSHostingView(
-      rootView: GeneralPane(settings: settings, onShortcutChange: onShortcutChange)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(width: contentWidth))
-    let height = max(probe.fittingSize.height, 320)
+    func paneHeight<Pane: View>(_ pane: Pane) -> CGFloat {
+      NSHostingView(
+        rootView:
+          pane
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(width: contentWidth)
+      ).fittingSize.height
+    }
+    let height = max(
+      paneHeight(GeneralPane(settings: settings, onShortcutChange: onShortcutChange)),
+      paneHeight(LoggingPane(settings: settings)),
+      320)
 
     let view = SettingsView(settings: settings, onShortcutChange: onShortcutChange)
     let newWindow = NSWindow(
@@ -65,6 +72,7 @@ final class SettingsWindowController {
 
 enum SettingsPane: String, CaseIterable, Identifiable {
   case general
+  case logging
   case about
 
   var id: String { rawValue }
@@ -72,6 +80,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   var label: String {
     switch self {
     case .general: return "General"
+    case .logging: return "Logging"
     case .about: return "About"
     }
   }
@@ -79,6 +88,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   var icon: String {
     switch self {
     case .general: return "gearshape"
+    case .logging: return "doc.text"
     case .about: return "info.circle"
     }
   }
@@ -111,6 +121,8 @@ struct SettingsView: View {
     switch selectedPane {
     case .general:
       GeneralPane(settings: settings, onShortcutChange: onShortcutChange)
+    case .logging:
+      LoggingPane(settings: settings)
     case .about:
       AboutPane()
     }
@@ -123,14 +135,11 @@ struct GeneralPane: View {
 
   @State private var launchAtLogin = LaunchAtLogin.isEnabled
   @State private var shortcut: ToggleShortcut?
-  @State private var debugLogging: Bool
-  @State private var exportingLogs = false
 
   init(settings: SettingsStoring, onShortcutChange: @escaping (ToggleShortcut?) -> Void) {
     self.settings = settings
     self.onShortcutChange = onShortcutChange
     _shortcut = State(initialValue: settings.toggleShortcut)
-    _debugLogging = State(initialValue: settings.debugLogging)
   }
 
   var body: some View {
@@ -167,7 +176,29 @@ struct GeneralPane: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+    }
+    .formStyle(.grouped)
+    .onChange(of: shortcut) { newValue in
+      settings.toggleShortcut = newValue
+      onShortcutChange(newValue)
+    }
+  }
+}
 
+struct LoggingPane: View {
+  let settings: SettingsStoring
+
+  @State private var debugLogging: Bool
+  @State private var logText = ""
+  @State private var isLoading = false
+
+  init(settings: SettingsStoring) {
+    self.settings = settings
+    _debugLogging = State(initialValue: settings.debugLogging)
+  }
+
+  var body: some View {
+    Form {
       Section {
         Toggle("Verbose logging", isOn: $debugLogging)
           .onChange(of: debugLogging) { newValue in
@@ -176,22 +207,70 @@ struct GeneralPane: View {
         Text("Writes detailed diagnostics to the system log.")
           .font(.caption)
           .foregroundStyle(.secondary)
-        Button(exportingLogs ? "Exporting logs…" : "View Logs in Console…") {
-          exportingLogs = true
-          LogViewer.exportAndOpen { _ in
-            exportingLogs = false
+      }
+
+      Section {
+        logView
+          .frame(height: 200)
+        HStack {
+          Button {
+            load()
+          } label: {
+            Label("Refresh", systemImage: "arrow.clockwise")
           }
+          .disabled(isLoading)
+          Spacer()
+          Button("Save Logs…") {
+            saveLogs()
+          }
+          .disabled(isLoading || logText.isEmpty)
         }
-        .disabled(exportingLogs)
-        Text("Exports the last 24 hours of Micspresso's log entries and opens them in Console.")
+        Text("Micspresso's system log entries from the last 24 hours.")
           .font(.caption)
           .foregroundStyle(.secondary)
       }
     }
     .formStyle(.grouped)
-    .onChange(of: shortcut) { newValue in
-      settings.toggleShortcut = newValue
-      onShortcutChange(newValue)
+    .onAppear {
+      if logText.isEmpty {
+        load()
+      }
+    }
+  }
+
+  private var logView: some View {
+    ScrollViewReader { proxy in
+      ScrollView {
+        Text(isLoading && logText.isEmpty ? "Loading logs…" : logText)
+          .font(.system(size: 10, design: .monospaced))
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        Color.clear.frame(height: 1).id("bottom")
+      }
+      .onChange(of: logText) { _ in
+        proxy.scrollTo("bottom", anchor: .bottom)
+      }
+    }
+  }
+
+  private func load() {
+    isLoading = true
+    SystemLogReader.fetch { text in
+      logText = text
+      isLoading = false
+    }
+  }
+
+  private func saveLogs() {
+    let panel = NSSavePanel()
+    panel.nameFieldStringValue = SystemLogReader.suggestedFileName
+    panel.begin { response in
+      guard response == .OK, let url = panel.url else { return }
+      do {
+        try logText.write(to: url, atomically: true, encoding: .utf8)
+      } catch {
+        DiagnosticsLog(category: "app").error("Saving logs failed: \(error)")
+      }
     }
   }
 }
