@@ -131,7 +131,7 @@ jobs:
             desc "Menu bar app that keeps Bluetooth mics warm so dictation starts instantly"
             homepage "https://github.com/moltenbits/micspresso"
 
-            depends_on macos: ">= :ventura"
+            depends_on macos: :ventura
 
             app "Micspresso.app"
             binary "#{appdir}/Micspresso.app/Contents/MacOS/micspresso"
