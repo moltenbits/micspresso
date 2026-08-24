@@ -7,6 +7,7 @@ final class SettingsWindowController {
   private var window: NSWindow?
   private let settings: SettingsStoring
   private let onShortcutChange: (ToggleShortcut?) -> Void
+  private let activationCoordinator = SettingsActivationCoordinator()
 
   private static let windowWidth: CGFloat = 540
   private static let sidebarWidth: CGFloat = 150
@@ -17,6 +18,8 @@ final class SettingsWindowController {
   }
 
   func show() {
+    activationCoordinator.settingsWillShow()
+
     if let window, window.isVisible {
       window.makeKeyAndOrderFront(nil)
       activateApp()
@@ -48,6 +51,7 @@ final class SettingsWindowController {
       defer: false
     )
     newWindow.title = "Micspresso Settings"
+    newWindow.delegate = activationCoordinator
     newWindow.contentView = NSHostingView(rootView: view)
     newWindow.center()
     newWindow.isReleasedWhenClosed = false

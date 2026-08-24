@@ -23,5 +23,9 @@ let package = Package(
             name: "MicspressoCoreTests",
             dependencies: ["MicspressoCore"]
         ),
+        .testTarget(
+            name: "MicspressoAppTests",
+            dependencies: ["micspresso"]
+        ),
     ]
 )
