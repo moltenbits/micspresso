@@ -5,6 +5,9 @@
 ## User settings
 xcuserdata/
 
+# JetBrains
+.idea/
+
 ## Obj-C/Swift specific
 *.hmap
 
