@@ -17,7 +17,7 @@ final class MockAudioInputProvider: AudioInputProviding {
 
 final class MockMicWarmer: MicWarming {
   private(set) var warmedDeviceID: UInt32?
-  var deliveryCount: UInt64 = 0
+  var deliverySnapshot = MicDeliverySnapshot()
 
   private(set) var startedDevices: [AudioInputDevice] = []
   private(set) var stopCount = 0

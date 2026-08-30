@@ -1,4 +1,5 @@
 import CoreAudio
+import Darwin
 import Foundation
 
 public enum MicWarmerError: Error, LocalizedError, Equatable {
@@ -17,7 +18,8 @@ public enum MicWarmerError: Error, LocalizedError, Equatable {
 
 /// Keeps a device warm by running a no-op HAL IOProc on it. The device sees
 /// an active capture client — which is what keeps Bluetooth mics out of
-/// power-saving — but the audio buffers are never read, copied, or stored.
+/// power-saving. The IOProc checks only whether each buffer is entirely zero;
+/// it never retains, copies, logs, or transmits audio samples.
 ///
 /// Deliberately uses the HAL directly instead of AVCaptureSession: session
 /// teardown on an already-disconnected Bluetooth device is entangled with
@@ -26,31 +28,27 @@ public enum MicWarmerError: Error, LocalizedError, Equatable {
 public final class CoreAudioMicWarmer: MicWarming {
   public private(set) var warmedDeviceID: UInt32?
   private var procID: AudioDeviceIOProcID?
+  private let log = DiagnosticsLog(category: "audio")
 
-  /// Written by the IOProc on the HAL's realtime thread, read by the
-  /// engine's heartbeat on the main thread. Aligned 64-bit loads/stores
-  /// are atomic on arm64 and x86_64, and an occasionally-stale read only
-  /// delays the heartbeat by one tick, so no lock is needed.
-  private let callbackCounter: UnsafeMutablePointer<UInt64>
+  /// Written by the IOProc on HAL's realtime thread and sampled by the engine
+  /// on the main thread. The counters use lock-free atomic operations so the
+  /// realtime callback never waits on the heartbeat reader.
+  private let deliveryCounters = MicDeliveryCounters()
 
-  public init() {
-    callbackCounter = .allocate(capacity: 1)
-    callbackCounter.initialize(to: 0)
-  }
+  public init() {}
 
   deinit {
     stopWarming()
-    callbackCounter.deallocate()
   }
 
-  public var deliveryCount: UInt64 { callbackCounter.pointee }
+  public var deliverySnapshot: MicDeliverySnapshot { deliveryCounters.snapshot }
 
   public func startWarming(device: AudioInputDevice) throws {
     stopWarming()
 
     var newProcID: AudioDeviceIOProcID?
     let createStatus = AudioDeviceCreateIOProcID(
-      device.id, warmIOProc, UnsafeMutableRawPointer(callbackCounter), &newProcID)
+      device.id, warmIOProc, Unmanaged.passUnretained(deliveryCounters).toOpaque(), &newProcID)
     guard createStatus == noErr, let newProcID else {
       throw MicWarmerError.createIOProcFailed(createStatus)
     }
@@ -69,17 +67,64 @@ public final class CoreAudioMicWarmer: MicWarming {
     guard let procID, let deviceID = warmedDeviceID else { return }
     // Best effort: on a disconnected device these return errors, which is
     // fine — the HAL has already torn the IO down.
-    AudioDeviceStop(deviceID, procID)
-    AudioDeviceDestroyIOProcID(deviceID, procID)
+    let stopStatus = AudioDeviceStop(deviceID, procID)
+    let destroyStatus = AudioDeviceDestroyIOProcID(deviceID, procID)
+    if stopStatus != noErr || destroyStatus != noErr {
+      log.warning(
+        "HAL release for device [\(deviceID)] returned stop=\(stopStatus), destroy=\(destroyStatus)"
+      )
+    }
     self.procID = nil
     warmedDeviceID = nil
   }
 }
 
-/// Runs on the HAL realtime thread: count the callback and ignore the audio.
-private let warmIOProc: AudioDeviceIOProc = { _, _, _, _, _, _, clientData in
+/// Fixed-size metadata updated by the realtime callback without allocation,
+/// locking, copying, or retaining any audio.
+final class MicDeliveryCounters {
+  private let callbackCount: UnsafeMutablePointer<Int64>
+  private let nonzeroCallbackCount: UnsafeMutablePointer<Int64>
+
+  init() {
+    callbackCount = .allocate(capacity: 1)
+    callbackCount.initialize(to: 0)
+    nonzeroCallbackCount = .allocate(capacity: 1)
+    nonzeroCallbackCount.initialize(to: 0)
+  }
+
+  deinit {
+    callbackCount.deinitialize(count: 1)
+    callbackCount.deallocate()
+    nonzeroCallbackCount.deinitialize(count: 1)
+    nonzeroCallbackCount.deallocate()
+  }
+
+  var snapshot: MicDeliverySnapshot {
+    MicDeliverySnapshot(
+      callbackCount: UInt64(bitPattern: OSAtomicAdd64(0, callbackCount)),
+      nonzeroCallbackCount: UInt64(bitPattern: OSAtomicAdd64(0, nonzeroCallbackCount)))
+  }
+
+  func record(inputData: UnsafePointer<AudioBufferList>) {
+    OSAtomicIncrement64(callbackCount)
+
+    let buffers = UnsafeMutableAudioBufferListPointer(
+      UnsafeMutablePointer(mutating: inputData))
+    for buffer in buffers {
+      guard let data = buffer.mData, buffer.mDataByteSize > 0 else { continue }
+      let bytes = data.assumingMemoryBound(to: UInt8.self)
+      for index in 0..<Int(buffer.mDataByteSize) where bytes[index] != 0 {
+        OSAtomicIncrement64(nonzeroCallbackCount)
+        return
+      }
+    }
+  }
+}
+
+private let warmIOProc: AudioDeviceIOProc = { _, _, inputData, _, _, _, clientData in
   if let clientData {
-    clientData.assumingMemoryBound(to: UInt64.self).pointee &+= 1
+    Unmanaged<MicDeliveryCounters>.fromOpaque(clientData).takeUnretainedValue().record(
+      inputData: inputData)
   }
   return noErr
 }
