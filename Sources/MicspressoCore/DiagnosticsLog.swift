@@ -11,8 +11,8 @@ import os
 /// `log stream --debug`, never stored).
 ///
 /// Messages are logged with public visibility on purpose — device names and
-/// engine states are the diagnostic content. No audio is ever logged; the
-/// app never reads any.
+/// engine states are the diagnostic content. Audio is never logged; only
+/// fixed-size delivery-health counters derived by the realtime callback are.
 public struct DiagnosticsLog {
   private let logger: Logger
   private let isVerbose: () -> Bool

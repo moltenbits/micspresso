@@ -42,10 +42,16 @@ public struct EngineTiming {
   public var deviceSettleDelay: TimeInterval = 2.0
   /// How often the heartbeat checks that IO callbacks are still flowing.
   public var heartbeatInterval: TimeInterval = 5.0
-  /// Consecutive stalled heartbeats tolerated before restarting the warm
-  /// session. coreaudiod restarts kill sessions without any notification,
-  /// so a stalled delivery count is the only signal.
+  /// Consecutive stalled heartbeats tolerated before releasing the warm
+  /// session. coreaudiod restarts kill sessions without any notification.
   public var stalledTicksBeforeRestart = 2
+  /// Consecutive heartbeat intervals containing callbacks but no nonzero
+  /// input bytes before treating the warm session as poisoned.
+  public var zeroOnlyTicksBeforeRecovery = 2
+  /// A health recovery deliberately leaves the device released before
+  /// reacquiring it so Core Audio can renegotiate the Bluetooth session.
+  public var healthRecoveryBaseDelay: TimeInterval = 2.0
+  public var healthRecoveryMaxDelay: TimeInterval = 30.0
   public var retryBaseDelay: TimeInterval = 1.0
   public var retryMaxDelay: TimeInterval = 30.0
 
@@ -84,8 +90,11 @@ public final class KeepWarmEngine {
   private var retryTimer: EngineTimer?
   private var heartbeatTimer: EngineTimer?
   private var retryAttempts = 0
-  private var lastDeliveryCount: UInt64 = 0
+  private var healthRecoveryAttempts = 0
+  private var healthRecoveryDeviceUID: String?
+  private var lastDeliverySnapshot = MicDeliverySnapshot()
   private var stalledHeartbeats = 0
+  private var zeroOnlyHeartbeats = 0
 
   public init(
     provider: AudioInputProviding,
@@ -245,8 +254,8 @@ public final class KeepWarmEngine {
 
   private func scheduleRetry() {
     retryAttempts += 1
-    let exponential = timing.retryBaseDelay * pow(2.0, Double(retryAttempts - 1))
-    let delay = min(exponential, timing.retryMaxDelay)
+    let delay = backoffDelay(
+      attempt: retryAttempts, base: timing.retryBaseDelay, maximum: timing.retryMaxDelay)
     log.debug("Retrying in \(delay)s (attempt \(retryAttempts))")
     retryTimer = scheduler.schedule(after: delay) { [weak self] in
       self?.reconcile()
@@ -254,29 +263,96 @@ public final class KeepWarmEngine {
   }
 
   private func resetHeartbeat() {
-    lastDeliveryCount = warmer.deliveryCount
+    lastDeliverySnapshot = warmer.deliverySnapshot
     stalledHeartbeats = 0
+    zeroOnlyHeartbeats = 0
+    log.debug(
+      "Heartbeat baseline: callbacks=\(lastDeliverySnapshot.callbackCount), nonzero=\(lastDeliverySnapshot.nonzeroCallbackCount)"
+    )
   }
 
   private func heartbeatTick() {
-    guard case .warming = state else {
+    guard case .warming(let device) = state else {
       stalledHeartbeats = 0
+      zeroOnlyHeartbeats = 0
       return
     }
-    let count = warmer.deliveryCount
-    defer { lastDeliveryCount = count }
+    let snapshot = warmer.deliverySnapshot
+    let callbackDelta = snapshot.callbackCount &- lastDeliverySnapshot.callbackCount
+    let nonzeroDelta =
+      snapshot.nonzeroCallbackCount &- lastDeliverySnapshot.nonzeroCallbackCount
+    defer { lastDeliverySnapshot = snapshot }
 
-    guard count == lastDeliveryCount else {
-      log.debug("Heartbeat: \(count) IO callbacks delivered")
-      stalledHeartbeats = 0
+    guard callbackDelta > 0 else {
+      zeroOnlyHeartbeats = 0
+      stalledHeartbeats += 1
+      log.debug(
+        "Heartbeat: stalled at \(snapshot.callbackCount) callbacks (\(stalledHeartbeats) ticks)"
+      )
+      guard stalledHeartbeats >= timing.stalledTicksBeforeRestart else { return }
+
+      recoverUnhealthySession(reason: "no IO callbacks")
       return
     }
-    stalledHeartbeats += 1
-    log.debug("Heartbeat: stalled at \(count) callbacks (\(stalledHeartbeats) ticks)")
-    guard stalledHeartbeats >= timing.stalledTicksBeforeRestart else { return }
 
-    log.warning("Warm session stalled (no IO callbacks); restarting")
+    stalledHeartbeats = 0
+    log.debug(
+      "Heartbeat: callbacks=\(snapshot.callbackCount) (+\(callbackDelta)), nonzero=\(snapshot.nonzeroCallbackCount) (+\(nonzeroDelta))"
+    )
+
+    guard nonzeroDelta == 0 else {
+      zeroOnlyHeartbeats = 0
+      if healthRecoveryAttempts > 0 {
+        log.notice(
+          "Warm session recovered on \(device.name) [\(device.id)]: \(nonzeroDelta) signal-bearing callbacks observed after attempt \(healthRecoveryAttempts)"
+        )
+      }
+      healthRecoveryAttempts = 0
+      healthRecoveryDeviceUID = nil
+      return
+    }
+
+    zeroOnlyHeartbeats += 1
+    log.debug(
+      "Heartbeat: all \(callbackDelta) callbacks were zero-only (\(zeroOnlyHeartbeats) ticks)")
+    guard zeroOnlyHeartbeats >= timing.zeroOnlyTicksBeforeRecovery else { return }
+
+    let seconds = timing.heartbeatInterval * Double(zeroOnlyHeartbeats)
+    recoverUnhealthySession(reason: "only zeroed input buffers for \(seconds)s")
+  }
+
+  private func recoverUnhealthySession(reason: String) {
+    guard case .warming(let device) = state else { return }
+
+    if healthRecoveryDeviceUID != device.uid {
+      healthRecoveryAttempts = 0
+      healthRecoveryDeviceUID = device.uid
+    }
+    healthRecoveryAttempts += 1
+    let delay = backoffDelay(
+      attempt: healthRecoveryAttempts,
+      base: timing.healthRecoveryBaseDelay,
+      maximum: timing.healthRecoveryMaxDelay)
+
+    log.warning(
+      "Unhealthy warm session on \(device.name) [\(device.id)]: \(reason); releasing for \(delay)s before retry (attempt \(healthRecoveryAttempts))"
+    )
     stopWarming()
-    reconcile()
+    state = .warmingFailed(device)
+    retryTimer?.cancel()
+    retryTimer = scheduler.schedule(after: delay) { [weak self] in
+      guard let self else { return }
+      self.retryTimer = nil
+      self.log.notice(
+        "Health recovery cooldown ended for \(device.name) [\(device.id)]; resolving current device"
+      )
+      self.reconcile()
+    }
+  }
+
+  private func backoffDelay(
+    attempt: Int, base: TimeInterval, maximum: TimeInterval
+  ) -> TimeInterval {
+    min(base * pow(2.0, Double(attempt - 1)), maximum)
   }
 }

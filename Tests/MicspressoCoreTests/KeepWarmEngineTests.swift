@@ -362,18 +362,24 @@ final class KeepWarmEngineTests: XCTestCase {
 
   // MARK: - Heartbeat watchdog
 
-  func testStalledDeliveryRestartsWarmingAfterTwoTicks() {
+  func testStalledDeliveryReleasesWarmingAfterTwoTicksAndReacquiresAfterCooldown() {
     engine.start()
-    warmer.deliveryCount = 10
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 10, nonzeroCallbackCount: 10)
     scheduler.fireHeartbeat()  // records baseline advance
 
     // Delivery freezes (e.g. coreaudiod restarted).
     scheduler.fireHeartbeat()  // first stalled tick
     XCTAssertEqual(warmer.startedDevices.count, 1)
 
-    scheduler.fireHeartbeat()  // second stalled tick -> restart
+    scheduler.fireHeartbeat()  // second stalled tick -> release
 
     XCTAssertEqual(warmer.stopCount, 1)
+    XCTAssertEqual(warmer.startedDevices.count, 1, "device must remain released during cooldown")
+    XCTAssertEqual(engine.state, .warmingFailed(.airPods()))
+    XCTAssertEqual(scheduler.pendingOneShots.last?.delay, 2.0)
+
+    scheduler.fireLastOneShot()
+
     XCTAssertEqual(warmer.startedDevices.count, 2)
     XCTAssertEqual(engine.state, .warming(.airPods()))
   }
@@ -382,12 +388,115 @@ final class KeepWarmEngineTests: XCTestCase {
     engine.start()
 
     for tick in 1...5 {
-      warmer.deliveryCount = UInt64(tick * 100)
+      warmer.deliverySnapshot = MicDeliverySnapshot(
+        callbackCount: UInt64(tick * 100), nonzeroCallbackCount: UInt64(tick))
       scheduler.fireHeartbeat()
     }
 
     XCTAssertEqual(warmer.startedDevices.count, 1)
     XCTAssertEqual(warmer.stopCount, 0)
+  }
+
+  func testAllZeroDeliveryReleasesDeviceAndReacquiresAfterCooldown() {
+    engine.start()
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 100, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+    XCTAssertEqual(warmer.stopCount, 0)
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 200, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+
+    XCTAssertEqual(warmer.stopCount, 1)
+    XCTAssertNil(warmer.warmedDeviceID)
+    XCTAssertEqual(warmer.startedDevices.count, 1, "recovery must include a released interval")
+    XCTAssertEqual(engine.state, .warmingFailed(.airPods()))
+    XCTAssertEqual(scheduler.pendingOneShots.last?.delay, 2.0)
+
+    scheduler.fireLastOneShot()
+
+    XCTAssertEqual(warmer.startedDevices.count, 2)
+    XCTAssertEqual(engine.state, .warming(.airPods()))
+  }
+
+  func testNonzeroDeliveryResetsAllZeroDetection() {
+    engine.start()
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 100, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 200, nonzeroCallbackCount: 1)
+    scheduler.fireHeartbeat()
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 300, nonzeroCallbackCount: 1)
+    scheduler.fireHeartbeat()
+    XCTAssertEqual(warmer.stopCount, 0, "first zero-only interval after signal must be tolerated")
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 400, nonzeroCallbackCount: 1)
+    scheduler.fireHeartbeat()
+    XCTAssertEqual(warmer.stopCount, 1)
+  }
+
+  func testUnhealthySessionRecoveryBacksOffUntilSignalReturns() {
+    engine.start()
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 100, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 200, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+    XCTAssertEqual(scheduler.pendingOneShots.last?.delay, 2.0)
+    scheduler.fireLastOneShot()
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 300, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 400, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+    XCTAssertEqual(scheduler.pendingOneShots.last?.delay, 4.0)
+    scheduler.fireLastOneShot()
+
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 500, nonzeroCallbackCount: 1)
+    scheduler.fireHeartbeat()
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 600, nonzeroCallbackCount: 1)
+    scheduler.fireHeartbeat()
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 700, nonzeroCallbackCount: 1)
+    scheduler.fireHeartbeat()
+
+    XCTAssertEqual(scheduler.pendingOneShots.last?.delay, 2.0)
+  }
+
+  func testUnhealthySessionRecoveryBackoffIsCapped() {
+    engine.start()
+    var callbackCount: UInt64 = 0
+
+    for expectedDelay in [2.0, 4.0, 8.0, 16.0, 30.0, 30.0] {
+      callbackCount += 100
+      warmer.deliverySnapshot = MicDeliverySnapshot(
+        callbackCount: callbackCount, nonzeroCallbackCount: 0)
+      scheduler.fireHeartbeat()
+      callbackCount += 100
+      warmer.deliverySnapshot = MicDeliverySnapshot(
+        callbackCount: callbackCount, nonzeroCallbackCount: 0)
+      scheduler.fireHeartbeat()
+
+      XCTAssertEqual(scheduler.pendingOneShots.last?.delay, expectedDelay)
+      scheduler.fireLastOneShot()
+    }
+  }
+
+  func testPausingCancelsPendingHealthRecovery() {
+    engine.start()
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 100, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+    warmer.deliverySnapshot = MicDeliverySnapshot(callbackCount: 200, nonzeroCallbackCount: 0)
+    scheduler.fireHeartbeat()
+    let recoveryTimer = scheduler.pendingOneShots.last
+
+    engine.setEnabled(false)
+    recoveryTimer?.fire()
+
+    XCTAssertTrue(recoveryTimer?.cancelled == true)
+    XCTAssertEqual(engine.state, .paused)
+    XCTAssertEqual(warmer.startedDevices.count, 1)
   }
 
   func testHeartbeatIgnoredWhenNotWarming() {

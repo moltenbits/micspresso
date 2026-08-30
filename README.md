@@ -28,9 +28,10 @@ Only Bluetooth mics are kept awake: wired and built-in mics have no wake-up
 delay, so holding them open would light the privacy indicator for nothing.
 When no Bluetooth mic is connected, Micspresso simply idles.
 
-**Micspresso never reads, stores, or transmits audio.** The capture callback
-literally ignores the buffers — it counts them (to detect a dead session) and
-returns.
+**Micspresso never stores or transmits audio.** The realtime callback only
+checks whether each delivered buffer is entirely zero and increments two
+fixed-size health counters. Samples are never retained, copied, logged, or
+sent anywhere.
 
 ## Install
 
@@ -89,9 +90,11 @@ The CLI binary also answers `--version` and `--help`.
   system default input for auto-picking. Change events are debounced for a
   couple of seconds because a single Bluetooth handoff fires several rapid
   events — sometimes with a transient "no default input" in the middle.
-- A **heartbeat watchdog** notices when IO callbacks stop flowing (a
-  coreaudiod restart kills capture sessions without any notification) and
-  rebuilds the session.
+- A **heartbeat watchdog** notices both when IO callbacks stop flowing and
+  when they continue carrying only zeroed buffers. It fully releases an
+  unhealthy session for a backoff-controlled cooldown before reacquiring the
+  current device, allowing Core Audio to renegotiate a poisoned Bluetooth
+  link.
 - **Sleep/wake aware**: the mic is released *before* sleep — tearing down
   audio on an already-dead Bluetooth link is historically where tools like
   this deadlock — and re-warmed once devices settle after wake.
@@ -115,7 +118,8 @@ rebuilds after device changes, stall recoveries) to the unified system log:
 The Settings window's **Logging** pane shows the last 24 hours of entries
 in-app and can save them to a file; **Verbose logging** there adds deeper
 diagnostics (raw device-change events, heartbeat ticks, retry scheduling).
-Audio content is never logged; the app never reads any.
+Audio content is never logged. Diagnostics contain only device metadata,
+recovery decisions, and aggregate callback/nonzero-buffer counters.
 
 ## Prior art
 

@@ -9,15 +9,28 @@ public protocol AudioInputProviding: AnyObject {
   var defaultInputDevice: AudioInputDevice? { get }
 }
 
+/// Bounded health metadata derived from the warmed input stream. No audio
+/// samples are retained: the counters only distinguish callback delivery from
+/// callbacks whose buffers contain at least one nonzero byte.
+public struct MicDeliverySnapshot: Equatable {
+  public let callbackCount: UInt64
+  public let nonzeroCallbackCount: UInt64
+
+  public init(callbackCount: UInt64 = 0, nonzeroCallbackCount: UInt64 = 0) {
+    self.callbackCount = callbackCount
+    self.nonzeroCallbackCount = nonzeroCallbackCount
+  }
+}
+
 /// Holds an input device open so it stays out of power-saving mode.
-/// Implementations must never retain or inspect the captured audio.
+/// Implementations must never retain, copy, log, or transmit captured audio.
+/// They may inspect buffers only to derive bounded delivery-health metadata.
 public protocol MicWarming: AnyObject {
   /// The device currently being kept warm, if any.
   var warmedDeviceID: UInt32? { get }
-  /// Monotonic count of IO callbacks delivered by the warmed device.
-  /// Used by the engine's heartbeat to detect silently-dead sessions
-  /// (e.g. after a coreaudiod restart, which gives no notification).
-  var deliveryCount: UInt64 { get }
+  /// Monotonic callback and signal-bearing callback counters used by the
+  /// engine to detect both dead and all-zero sessions.
+  var deliverySnapshot: MicDeliverySnapshot { get }
   func startWarming(device: AudioInputDevice) throws
   func stopWarming()
 }
